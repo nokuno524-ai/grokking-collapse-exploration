@@ -11,7 +11,15 @@ from typing import List, Dict, Optional
 
 
 def load_results(condition_dir: Path) -> Dict:
-    """Load results JSON for a condition."""
+    """
+    Load the results.json file for a specific experimental condition.
+
+    Args:
+        condition_dir: Path to the directory containing the results file.
+
+    Returns:
+        A dictionary containing the parsed JSON data.
+    """
     with open(condition_dir / "results.json") as f:
         return json.load(f)
 
@@ -22,6 +30,13 @@ def compute_excluded_loss(history: List[Dict], prime: int = 59) -> List[float]:
     This is a progress measure from Chan et al.
     
     High excluded loss = model relies on those components = circuit formation in progress.
+
+    Args:
+        history: The training history list containing dictionaries of metrics per step.
+        prime: The modulus used for the task.
+
+    Returns:
+        A list of computed excluded loss values corresponding to each step in history.
     """
     excluded = []
     for entry in history:
@@ -35,8 +50,15 @@ def compute_excluded_loss(history: List[Dict], prime: int = 59) -> List[float]:
 def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
                             threshold: float = 0.9) -> Optional[int]:
     """
-    Detect the step at which a phase transition occurs.
-    Returns the step number or None if no transition detected.
+    Detect the step at which a phase transition occurs for a given metric.
+
+    Args:
+        history: Training history containing step-by-step metrics.
+        metric: The dictionary key of the metric to check (e.g., "test_acc").
+        threshold: The value the metric must exceed to trigger detection.
+
+    Returns:
+        The step number where the threshold was first met, or None if it never occurs.
     """
     for entry in history:
         if entry.get(metric, 0) >= threshold:
@@ -46,7 +68,18 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
 
 def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
                            window: int = 10) -> List[Dict]:
-    """Compute rate of change of a metric over a sliding window."""
+    """
+    Compute the rate of change (speed) of a metric over a sliding window of steps.
+
+    Args:
+        history: Training history list.
+        metric: The key of the metric to calculate speed for.
+        window: The size of the sliding window used for calculating the difference.
+
+    Returns:
+        A list of dictionaries containing the "step" and the calculated "{metric}_speed"
+        (scaled per 1000 steps).
+    """
     speeds = []
     for i in range(len(history)):
         if i < window:
@@ -62,11 +95,18 @@ def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
 
 def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     """
-    Analyze the full grokking trajectory, identifying phases.
+    Analyze the full grokking trajectory from history metrics, identifying key phases.
+
+    Phase 1: Memorization (train_acc > 0.99, test_acc stays low)
+    Phase 2: Circuit formation (fourier_concentration rapidly rises)
+    Phase 3: Cleanup/grokking (test_acc jumps > 0.95, weight_norm decreases)
     
-    Phase 1: Memorization (train_acc rises, test_acc stays low)
-    Phase 2: Circuit formation (fourier_concentration rises)
-    Phase 3: Cleanup/grokking (test_acc jumps, weight_norm decreases)
+    Args:
+        history: The training history list.
+
+    Returns:
+        A dictionary containing the calculated steps for memorization, circuit onset,
+        and grokking, along with weight norm statistics.
     """
     if not history:
         return {"phases_detected": False}
@@ -107,7 +147,16 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
 
 
 def generate_comparison_table(results_dir: Path) -> str:
-    """Generate a markdown comparison table of all conditions."""
+    """
+    Generate a markdown-formatted comparison table summarizing the grokking outcomes
+    across all conditions found in the results directory.
+
+    Args:
+        results_dir: Path to the directory containing output condition subdirectories.
+
+    Returns:
+        A string representing the markdown table.
+    """
     rows = []
     rows.append("| Condition | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Embedding Rank |")
     rows.append("|-----------|----------|---------------|----------------|---------------|----------------|")

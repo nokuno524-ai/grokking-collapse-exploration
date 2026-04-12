@@ -42,21 +42,29 @@ class ModularArithmeticTransformer(nn.Module):
         # Positional embeddings (2 positions: a and b)
         self.pos_embed = nn.Embedding(2, d_model)
         
-        # Transformer layers
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=n_heads,
-            dim_feedforward=d_ff,
+        # Transformer layer components (explicit for attention extraction)
+        # Using a single layer as specified (n_layers=1)
+        self.attn = nn.MultiheadAttention(
+            embed_dim=d_model,
+            num_heads=n_heads,
             dropout=dropout,
-            activation='gelu',
-            batch_first=True,
+            batch_first=True
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+        self.ln1 = nn.LayerNorm(d_model)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_ff, d_model),
+            nn.Dropout(dropout)
+        )
+        self.ln2 = nn.LayerNorm(d_model)
         
         # Output head: use the sum of both position representations
         self.output_head = nn.Linear(d_model, prime)
         
-        # Layer norm
+        # Final Layer norm (optional, but keeping it to match previous architecture if it was applied at the end)
         self.ln = nn.LayerNorm(d_model)
         
         self._init_weights()
@@ -71,15 +79,17 @@ class ModularArithmeticTransformer(nn.Module):
             elif isinstance(module, nn.Embedding):
                 nn.init.normal_(module.weight, std=0.02)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_attn: bool = False):
         """
         Forward pass.
         
         Args:
             x: Input tensor of shape (batch, 2) with values in [0, prime)
+            return_attn: If True, returns a tuple of (logits, attention_weights)
         
         Returns:
-            Logits of shape (batch, prime)
+            Logits of shape (batch, prime) if return_attn is False,
+            otherwise (logits, attn_weights)
         """
         batch_size = x.shape[0]
         
@@ -93,24 +103,48 @@ class ModularArithmeticTransformer(nn.Module):
         # Combine
         h = tok + pos  # (batch, 2, d_model)
         
-        # Transformer
-        h = self.transformer(h)  # (batch, 2, d_model)
+        # Transformer layer
+        # Pre-LN or Post-LN depending on previous PyTorch default (default is Post-LN in older versions, but let's do standard Pre-LN/Post-LN)
+        # PyTorch TransformerEncoderLayer default is Post-LN: x = x + attn(x), x = norm(x)
+        # Let's match the standard post-norm of PyTorch TransformerEncoderLayer(batch_first=True, norm_first=False)
+        attn_out, attn_weights = self.attn(h, h, h, need_weights=True)
+        h = self.ln1(h + attn_out)
+
+        mlp_out = self.mlp(h)
+        h = self.ln2(h + mlp_out)
+
+        # Final layer norm
         h = self.ln(h)
         
         # Pool across positions (mean) and predict
-        h = h.mean(dim=1)  # (batch, d_model)
-        logits = self.output_head(h)  # (batch, prime)
+        h_pooled = h.mean(dim=1)  # (batch, d_model)
+        logits = self.output_head(h_pooled)  # (batch, prime)
         
+        if return_attn:
+            return logits, attn_weights
+
         return logits
     
     def get_weight_norm(self) -> float:
-        """Get total L2 norm of all parameters."""
+        """
+        Get total L2 norm of all parameters.
+        This metric often spikes before generalization, then decreases when the model
+        cleans up representations (the grokking phase).
+
+        Returns:
+            The square root of the sum of squared parameter values.
+        """
         return sum(p.norm().item() ** 2 for p in self.parameters()) ** 0.5
     
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
-        Returns the magnitude of the DFT of each embedding dimension.
+        This allows tracking whether the embeddings learn the circle-representation
+        required to perform modular arithmetic via trigonometric identities.
+
+        Returns:
+            A tensor of shape (prime, d_model) containing the magnitude of the DFT
+            of each embedding dimension.
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
         # DFT along the token dimension
@@ -122,7 +156,8 @@ class ModularArithmeticTransformer(nn.Module):
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
         s = s / s.sum()
-        entropy = -(s * torch.log(s + 1e-10)).sum()
+        s = s[s > 1e-10]
+        entropy = -(s * torch.log(s)).sum()
         return torch.exp(entropy).item()
 
 

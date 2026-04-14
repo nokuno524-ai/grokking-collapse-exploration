@@ -60,6 +60,34 @@ def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
     return speeds
 
 
+def classify_run(history: List[Dict]) -> str:
+    """
+    Classify the training run into:
+    - grokking: test_acc > 0.95 at the end
+    - memorization: train_acc > 0.95 but test_acc < 0.95 at the end
+    - collapse: mode_collapse > 0.5 or kl_div > 1.0 (indicating distribution shifted significantly)
+    - normal/failed: otherwise
+    """
+    if not history:
+        return "failed"
+
+    final = history[-1]
+
+    # If grokking
+    if final.get("test_acc", 0) > 0.95:
+        return "grokking"
+
+    # If mode collapse or severe distribution shift detected
+    if final.get("mode_collapse", 0) > 0.5 or final.get("kl_div", 0) > 1.0:
+        return "collapse"
+
+    # If memorizing only
+    if final.get("train_acc", 0) > 0.95 and final.get("test_acc", 0) < 0.95:
+        return "memorization"
+
+    return "normal"
+
+
 def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     """
     Analyze the full grokking trajectory, identifying phases.
@@ -89,6 +117,8 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
         if curr_fc > 0.1 and curr_fc > prev_fc * 1.5:
             circuit_onset = history[i]["step"]
             break
+
+    classification = classify_run(history)
     
     # Compute key metrics
     max_weight_norm = max(e.get("weight_norm", 0) for e in history) if history else 0
@@ -96,6 +126,7 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     
     return {
         "phases_detected": True,
+        "classification": classification,
         "memorization_complete_step": mem_complete_step,
         "circuit_formation_onset": circuit_onset,
         "grokking_step": grok_step,
@@ -109,23 +140,26 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
 def generate_comparison_table(results_dir: Path) -> str:
     """Generate a markdown comparison table of all conditions."""
     rows = []
-    rows.append("| Condition | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Embedding Rank |")
-    rows.append("|-----------|----------|---------------|----------------|---------------|----------------|")
+    rows.append("| Condition | Class | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Mode Collapse |")
+    rows.append("|-----------|-------|----------|---------------|----------------|---------------|---------------|")
     
     for condition_dir in sorted(results_dir.iterdir()):
         if not condition_dir.is_dir():
             continue
         try:
             results = load_results(condition_dir)
+            history = results.get("history", [])
             name = condition_dir.name
+            run_class = classify_run(history)
             grokked = "✅" if results.get("grokked") else "❌"
             step = results.get("grokking_step", "N/A")
             acc = f"{results.get('final_test_acc', 0):.4f}"
             fc = f"{results.get('final_fourier_concentration', 0):.3f}"
-            rank = f"{results.get('final_embedding_rank', 0):.1f}"
-            rows.append(f"| {name} | {grokked} | {step} | {acc} | {fc} | {rank} |")
+            mode_collapse = history[-1].get('mode_collapse', 0.0) if history else 0.0
+            mc = f"{mode_collapse:.3f}"
+            rows.append(f"| {name} | {run_class} | {grokked} | {step} | {acc} | {fc} | {mc} |")
         except Exception as e:
-            rows.append(f"| {condition_dir.name} | Error | - | - | - | - |")
+            rows.append(f"| {condition_dir.name} | Error | - | - | - | - | - |")
     
     return "\n".join(rows)
 

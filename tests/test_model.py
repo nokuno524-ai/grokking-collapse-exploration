@@ -2,30 +2,33 @@ import torch
 import pytest
 from src.model import ModularArithmeticTransformer
 
-def test_modular_arithmetic_transformer_forward():
-    prime = 59
-    d_model = 128
-    batch_size = 4
+def test_model_forward():
+    model = ModularArithmeticTransformer(prime=59, d_model=128, n_heads=4, d_ff=512, n_layers=1)
+    x = torch.randint(0, 59, (10, 2))
 
-    model = ModularArithmeticTransformer(
-        prime=prime, d_model=d_model, n_heads=4, d_ff=512, n_layers=1
-    )
+    # Test without return_attn
+    logits = model(x)
+    assert logits.shape == (10, 59)
 
-    x = torch.randint(0, prime, (batch_size, 2))
-    out = model(x)
-    assert out.shape == (batch_size, prime)
+    # Test with return_attn
+    logits, attn = model(x, return_attn=True)
+    assert logits.shape == (10, 59)
+    assert attn.shape == (10, 2, 2)  # batch, tgt_len, src_len
 
-def test_model_metrics():
-    model = ModularArithmeticTransformer(prime=59, d_model=32)
-
+def test_model_weight_norm():
+    model = ModularArithmeticTransformer()
     norm = model.get_weight_norm()
     assert isinstance(norm, float)
-    assert norm > 0.0
+    assert norm > 0
 
-    spectrum = model.get_embedding_fourier_spectrum()
-    assert isinstance(spectrum, torch.Tensor)
-    assert spectrum.shape == (59, 32)
-
+def test_model_embedding_rank():
+    model = ModularArithmeticTransformer()
     rank = model.get_embedding_rank()
     assert isinstance(rank, float)
-    assert rank > 0.0
+    assert rank > 0
+
+def test_model_embedding_fourier_spectrum():
+    model = ModularArithmeticTransformer(prime=59, d_model=128)
+    spectrum = model.get_embedding_fourier_spectrum()
+    assert spectrum.shape == (59, 128)
+    assert torch.all(spectrum >= 0)  # Magnitudes should be positive

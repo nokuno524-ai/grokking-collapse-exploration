@@ -1,6 +1,5 @@
 """
 Progress measures for grokking analysis.
-
 Based on Chan et al. (2023) "Progress Measures for Grokking via Mechanistic Interpretability"
 """
 
@@ -12,7 +11,15 @@ from typing import List, Dict, Optional
 
 
 def load_results(condition_dir: Path) -> Dict:
-    """Load results JSON for a condition."""
+    """
+    Load the results.json file for a specific experimental condition.
+
+    Args:
+        condition_dir: Path to the directory containing the results file.
+
+    Returns:
+        A dictionary containing the parsed JSON data.
+    """
     with open(condition_dir / "results.json") as f:
         return json.load(f)
 
@@ -20,10 +27,16 @@ def load_results(condition_dir: Path) -> Dict:
 def compute_excluded_loss(history: List[Dict], prime: int = 59) -> List[float]:
     """
     Compute excluded loss — the loss attributable to specific Fourier components.
-
     This is a progress measure from Chan et al.
     
     High excluded loss = model relies on those components = circuit formation in progress.
+
+    Args:
+        history: The training history list containing dictionaries of metrics per step.
+        prime: The modulus used for the task.
+
+    Returns:
+        A list of computed excluded loss values corresponding to each step in history.
     """
     excluded = []
     for entry in history:
@@ -37,9 +50,15 @@ def compute_excluded_loss(history: List[Dict], prime: int = 59) -> List[float]:
 def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
                             threshold: float = 0.9) -> Optional[int]:
     """
-    Detect the step at which a phase transition occurs.
+    Detect the step at which a phase transition occurs for a given metric.
 
-    Returns the step number or None if no transition detected.
+    Args:
+        history: Training history containing step-by-step metrics.
+        metric: The dictionary key of the metric to check (e.g., "test_acc").
+        threshold: The value the metric must exceed to trigger detection.
+
+    Returns:
+        The step number where the threshold was first met, or None if it never occurs.
     """
     for entry in history:
         if entry.get(metric, 0) >= threshold:
@@ -49,7 +68,18 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
 
 def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
                            window: int = 10) -> List[Dict]:
-    """Compute rate of change of a metric over a sliding window."""
+    """
+    Compute the rate of change (speed) of a metric over a sliding window of steps.
+
+    Args:
+        history: Training history list.
+        metric: The key of the metric to calculate speed for.
+        window: The size of the sliding window used for calculating the difference.
+
+    Returns:
+        A list of dictionaries containing the "step" and the calculated "{metric}_speed"
+        (scaled per 1000 steps).
+    """
     speeds = []
     for i in range(len(history)):
         if i < window:
@@ -63,13 +93,48 @@ def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
     return speeds
 
 
+def classify_run(history: List[Dict]) -> str:
+    """
+    Classify the training run into:
+    - grokking: test_acc > 0.95 at the end
+    - memorization: train_acc > 0.95 but test_acc < 0.95 at the end
+    - collapse: mode_collapse > 0.5 or kl_div > 1.0 (indicating distribution shifted significantly)
+    - normal/failed: otherwise
+    """
+    if not history:
+        return "failed"
+
+    final = history[-1]
+
+    # If grokking
+    if final.get("test_acc", 0) > 0.95:
+        return "grokking"
+
+    # If mode collapse or severe distribution shift detected
+    if final.get("mode_collapse", 0) > 0.5 or final.get("kl_div", 0) > 1.0:
+        return "collapse"
+
+    # If memorizing only
+    if final.get("train_acc", 0) > 0.95 and final.get("test_acc", 0) < 0.95:
+        return "memorization"
+
+    return "normal"
+
+
 def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     """
-    Analyze the full grokking trajectory, identifying phases.
+    Analyze the full grokking trajectory from history metrics, identifying key phases.
+
+    Phase 1: Memorization (train_acc > 0.99, test_acc stays low)
+    Phase 2: Circuit formation (fourier_concentration rapidly rises)
+    Phase 3: Cleanup/grokking (test_acc jumps > 0.95, weight_norm decreases)
     
-    Phase 1: Memorization (train_acc rises, test_acc stays low)
-    Phase 2: Circuit formation (fourier_concentration rises)
-    Phase 3: Cleanup/grokking (test_acc jumps, weight_norm decreases)
+    Args:
+        history: The training history list.
+
+    Returns:
+        A dictionary containing the calculated steps for memorization, circuit onset,
+        and grokking, along with weight norm statistics.
     """
     if not history:
         return {"phases_detected": False}
@@ -92,6 +157,8 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
         if curr_fc > 0.1 and curr_fc > prev_fc * 1.5:
             circuit_onset = history[i]["step"]
             break
+
+    classification = classify_run(history)
     
     # Compute key metrics
     max_weight_norm = max(e.get("weight_norm", 0) for e in history) if history else 0
@@ -99,6 +166,7 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     
     return {
         "phases_detected": True,
+        "classification": classification,
         "memorization_complete_step": mem_complete_step,
         "circuit_formation_onset": circuit_onset,
         "grokking_step": grok_step,
@@ -110,25 +178,37 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
 
 
 def generate_comparison_table(results_dir: Path) -> str:
-    """Generate a markdown comparison table of all conditions."""
+    """
+    Generate a markdown-formatted comparison table summarizing the grokking outcomes
+    across all conditions found in the results directory.
+
+    Args:
+        results_dir: Path to the directory containing output condition subdirectories.
+
+    Returns:
+        A string representing the markdown table.
+    """
     rows = []
-    rows.append("| Condition | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Embedding Rank |")
-    rows.append("|-----------|----------|---------------|----------------|---------------|----------------|")
+    rows.append("| Condition | Class | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Mode Collapse |")
+    rows.append("|-----------|-------|----------|---------------|----------------|---------------|---------------|")
     
     for condition_dir in sorted(results_dir.iterdir()):
         if not condition_dir.is_dir():
             continue
         try:
             results = load_results(condition_dir)
+            history = results.get("history", [])
             name = condition_dir.name
+            run_class = classify_run(history)
             grokked = "✅" if results.get("grokked") else "❌"
             step = results.get("grokking_step", "N/A")
             acc = f"{results.get('final_test_acc', 0):.4f}"
             fc = f"{results.get('final_fourier_concentration', 0):.3f}"
-            rank = f"{results.get('final_embedding_rank', 0):.1f}"
-            rows.append(f"| {name} | {grokked} | {step} | {acc} | {fc} | {rank} |")
+            mode_collapse = history[-1].get('mode_collapse', 0.0) if history else 0.0
+            mc = f"{mode_collapse:.3f}"
+            rows.append(f"| {name} | {run_class} | {grokked} | {step} | {acc} | {fc} | {mc} |")
         except Exception as e:
-            rows.append(f"| {condition_dir.name} | Error | - | - | - | - |")
+            rows.append(f"| {condition_dir.name} | Error | - | - | - | - | - |")
     
     return "\n".join(rows)
 

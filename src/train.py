@@ -1,4 +1,6 @@
-"""Training loop with grokking detection and progress measures."""
+"""
+Training loop with grokking detection and progress measures.
+"""
 
 import torch
 import torch.nn as nn
@@ -6,23 +8,21 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
-import hydra
-from omegaconf import DictConfig, OmegaConf
+import os
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from typing import Optional, List, Tuple, Dict
+from typing import Optional, List
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from model import ModularArithmeticTransformer
 from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
 
 
 @dataclass
 class TrainConfig:
-    """Training configuration."""
-
+    """
+    Configuration for model architecture, training hyperparameters, and dataset generation.
+    Can be used to specify different collapse conditions to study their impact on grokking.
+    """
     # Model
     prime: int = 59
     d_model: int = 128
@@ -53,8 +53,10 @@ class TrainConfig:
 
 @dataclass
 class TrainState:
-    """Tracks training state and metrics."""
-
+    """
+    Tracks training metrics over time and stores the history of the run.
+    Records milestones such as the specific step where grokking occurs.
+    """
     step: int = 0
     train_loss: float = float('inf')
     test_loss: float = float('inf')
@@ -71,9 +73,16 @@ class TrainState:
 
 def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: int = 5) -> float:
     """
-    Measure how concentrated the Fourier spectrum is on the top-k frequencies.
+    Measure how concentrated the Fourier spectrum of the token embedding is on the top-k frequencies.
+    High concentration → grokking has occurred (or is occurring), representing circuit formation.
 
-    High concentration → grokking has occurred (or is occurring).
+    Args:
+        model: The transformer model.
+        top_k: Number of highest energy frequencies to measure against the total.
+
+    Returns:
+        A float between 0 and 1 indicating the fraction of energy in the top-k frequencies
+        (excluding the DC component).
     """
     spectrum = model.get_embedding_fourier_spectrum()  # (prime, d_model)
     # Average across embedding dimensions
@@ -88,7 +97,17 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
 
 
 def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+    """
+    Evaluate the model on a given dataset.
+
+    Args:
+        model: The transformer model to evaluate.
+        dataloader: DataLoader containing the dataset pairs and targets.
+        device: The device to perform the evaluation on.
+
+    Returns:
+        A tuple of (average_loss, accuracy).
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -108,7 +127,35 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment under a specific configuration.
+
+    This function sets up the data generators, creates the model, and runs the training
+    loop. It periodically evaluates the model, calculates progress measures, detects
+    the grokking threshold, and saves checkpoints.
+
+    Args:
+        config: The configuration object for the experiment.
+
+    Returns:
+        A TrainState object containing the final metrics, grokking milestones,
+        and the full training history.
+    """
+    # Try to initialize tensorboard/wandb
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+        tb_writer = SummaryWriter(log_dir=f"{config.output_dir}/{config.condition_name}/logs")
+    except ImportError:
+        tb_writer = None
+
+    try:
+        import wandb
+        if wandb.run is None:
+            # Only init if not already initialized (e.g. by external wrapper)
+            wandb.init(project="grokking-collapse", name=config.condition_name, config=asdict(config), mode="disabled") # Set to disabled to act as stub unless user configures
+    except ImportError:
+        pass
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
@@ -130,6 +177,9 @@ def train(config: TrainConfig) -> TrainState:
     train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
     
+    # Set seed right before model creation to ensure consistent weight init across conditions
+    torch.manual_seed(config.seed)
+
     # Create model
     model = ModularArithmeticTransformer(
         prime=config.prime,
@@ -223,6 +273,20 @@ def train(config: TrainConfig) -> TrainState:
                     f"fourier={state.fourier_concentration:.3f} | "
                     f"time={elapsed:.1f}s"
                 )
+
+                # Tensorboard log
+                if tb_writer:
+                    for k, v in entry.items():
+                        if k != "step":
+                            tb_writer.add_scalar(k, v, step)
+
+                # Wandb log
+                try:
+                    import wandb
+                    if wandb.run is not None:
+                        wandb.log(entry)
+                except ImportError:
+                    pass
         
         # Save checkpoint
         if step % config.save_every == 0:
@@ -257,66 +321,100 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(config: DictConfig) -> Dict:
-    """Run all experimental conditions."""
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+    """
+    Run all predefined experimental conditions to compare how varying levels of
+    synthetic data collapse affect grokking delays and metrics.
+
+    Args:
+        output_dir: Base directory to save the experiment results and checkpoints.
+        max_steps: Total training steps for each condition.
+
+    Returns:
+        A dictionary mapping condition names to their high-level results (grokked status,
+        grokking step, final accuracy, etc).
+    """
     conditions = get_all_conditions()
     results = {}
-
+    
     for name, data_config in conditions.items():
         print(f"\n{'='*60}")
         print(f"Running condition: {name}")
         print(f"{'='*60}")
-
-        cond_config = OmegaConf.merge(
-            config,
-            {"condition_name": name,
-             "collapse_level": data_config.collapse_level,
-             "collapse_severity": data_config.collapse_severity}
+        
+        train_config = TrainConfig(
+            collapse_level=data_config.collapse_level,
+            collapse_severity=data_config.collapse_severity,
+            condition_name=name,
+            output_dir=output_dir,
+            max_steps=max_steps,
         )
-
-        state = train(cond_config)
+        
+        state = train(train_config)
         results[name] = {
             "grokked": state.grokked,
             "grokking_step": state.grokking_step,
             "final_test_acc": state.test_acc,
             "fourier_concentration": state.fourier_concentration,
         }
-
+    
     # Summary
     print(f"\n{'='*60}")
     print("SUMMARY")
     print(f"{'='*60}")
     for name, r in results.items():
         status = "✅ GROKKED" if r["grokked"] else "❌ NO GROK"
-        print(
-            f"  {name:20s} | {status} | step={r['grokking_step']} | "
-            f"test_acc={r['final_test_acc']:.4f} | "
-            f"fourier={r['fourier_concentration']:.3f}"
-        )
-
+        print(f"  {name:20s} | {status} | step={r['grokking_step']} | "
+              f"test_acc={r['final_test_acc']:.4f} | fourier={r['fourier_concentration']:.3f}")
+    
     return results
 
-@hydra.main(version_base=None, config_path="../conf", config_name="config")
-def main(cfg: DictConfig):
-    """Execute main training block using Hydra config."""
-    if cfg.condition_name == "all":
-        run_all_conditions(cfg)
-    else:
-        conditions = get_all_conditions()
-        matched = None
-        for name, config_data in conditions.items():
-            if cfg.condition_name.lower() in name:
-                matched = name
-                break
-
-        if matched:
-            cfg.condition_name = matched
-            cfg.collapse_level = conditions[matched].collapse_level
-            cfg.collapse_severity = conditions[matched].collapse_severity
-            train(cfg)
-        else:
-            print(f"Unknown condition: {cfg.condition_name}")
-            print(f"Available: {list(conditions.keys())} or 'all'")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    import yaml
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default=None,
+                       help="Path to YAML configuration file")
+    parser.add_argument("--condition", type=str, default=None,
+                       help="Run specific condition (pure/low/medium/high/severe)")
+    parser.add_argument("--all", action="store_true", help="Run all conditions")
+    parser.add_argument("--max-steps", type=int, default=50000)
+    parser.add_argument("--output-dir", type=str, default="results")
+    args = parser.parse_args()
+    
+    if args.config:
+        with open(args.config, "r") as f:
+            yaml_config = yaml.safe_load(f)
+        train_config = TrainConfig(**yaml_config)
+        # Override output_dir if specified in args
+        if args.output_dir != "results":
+            train_config.output_dir = args.output_dir
+        train(train_config)
+    elif args.all:
+        run_all_conditions(args.output_dir, args.max_steps)
+    elif args.condition:
+        conditions = get_all_conditions()
+        # Match partial names
+        matched = None
+        for name, config in conditions.items():
+            if args.condition.lower() in name:
+                matched = name
+                break
+        if matched:
+            config = conditions[matched]
+            train_config = TrainConfig(
+                collapse_level=config.collapse_level,
+                collapse_severity=config.collapse_severity,
+                condition_name=matched,
+                output_dir=args.output_dir,
+                max_steps=args.max_steps,
+            )
+            train(train_config)
+        else:
+            print(f"Unknown condition: {args.condition}")
+            print(f"Available: {list(conditions.keys())}")
+    else:
+        # Default: run pure condition
+        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
+        train(train_config)

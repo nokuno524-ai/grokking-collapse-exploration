@@ -1,6 +1,5 @@
 """
 Mechanistic analysis of grokking-collapse interplay.
-
 Uses SAE-inspired feature analysis and data attribution to understand WHY collapse kills grokking.
 
 Three-pronged approach:
@@ -28,10 +27,11 @@ from data import generate_modular_arithmetic, DatasetConfig
 # ============================================================
 
 class FeatureSAE(nn.Module):
-    """Simple TopK SAE to decompose transformer hidden states."""
-
+    """
+    Simple TopK Sparse Autoencoder (SAE) to decompose transformer hidden states into
+    interpretable features. Uses a top-k activation mechanism to enforce sparsity.
+    """
     def __init__(self, d_model: int, n_features: int, k: int = 32):
-        """Initialize the SAE."""
         super().__init__()
         self.d_model = d_model
         self.n_features = n_features
@@ -44,7 +44,6 @@ class FeatureSAE(nn.Module):
             self.decoder.weight.div_(self.decoder.weight.norm(dim=0, keepdim=True) + 1e-8)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Perform forward pass mapping to sparse representation and reconstructing."""
         pre_acts = self.encoder(x)
         # TopK activation
         topk_vals, topk_idx = torch.topk(pre_acts, self.k, dim=-1)
@@ -54,7 +53,6 @@ class FeatureSAE(nn.Module):
         return recon, acts
 
     def loss(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Calculate reconstruction loss."""
         recon, acts = self.forward(x)
         recon_loss = F.mse_loss(recon, x)
         l0 = (acts > 0).float().mean()
@@ -72,7 +70,23 @@ def train_sae_on_hidden_states(
     batch_size: int = 256,
     device: str = "cpu",
 ) -> FeatureSAE:
-    """Train an SAE on the transformer's hidden representations."""
+    """
+    Train an SAE on the hidden representations extracted from a frozen transformer model.
+
+    Args:
+        model: The trained ModularArithmeticTransformer to analyze.
+        train_inputs: Tensor of input pairs used to generate the hidden states.
+        d_model: The hidden dimension of the transformer representations.
+        n_features: The number of dictionary features to learn in the SAE.
+        k: The number of active features per token (enforces sparsity).
+        n_steps: Training steps for the SAE.
+        lr: Learning rate for SAE optimization.
+        batch_size: Batch size for SAE training.
+        device: The compute device.
+
+    Returns:
+        The trained FeatureSAE model.
+    """
     model = model.to(device).eval()
     sae = FeatureSAE(d_model, n_features, k).to(device)
     optimizer = torch.optim.Adam(sae.parameters(), lr=lr)
@@ -123,13 +137,24 @@ def compute_tracin_scores(
     device: str = "cpu",
 ) -> torch.Tensor:
     """
-    Compute TracIn-style influence scores.
+    Compute TracIn-style influence scores: how much does each training example
+    contribute to the loss reduction on test examples?
 
-    How much does each training example contribute to the loss on test examples?
+    TracIn = sum over checkpoints of: grad_loss_train · grad_loss_test.
+    This helps identify which synthetic/collapsed examples disrupt grokking.
 
-    TracIn = sum over checkpoints of: grad_z_train · grad_z_test.
+    Args:
+        model: The ModularArithmeticTransformer architecture.
+        train_inputs: The training dataset inputs.
+        train_targets: The training dataset targets.
+        test_inputs: The test dataset inputs.
+        test_targets: The test dataset targets.
+        checkpoints: A list of loaded state dicts from different points in training.
+        lr: The learning rate used during model training.
+        device: The compute device.
 
-    Returns: (n_test, n_train) influence matrix
+    Returns:
+        An influence matrix of shape (n_test, n_train).
     """
     model = model.to(device)
     n_train = len(train_inputs)
@@ -176,8 +201,16 @@ def compute_tracin_scores(
 def analyze_fourier_circuit(model: ModularArithmeticTransformer, prime: int = 59) -> Dict:
     """
     Analyze the Fourier structure of the embedding and attention layers.
+    Based on Chan et al. (2023), grokking modular arithmetic involves learning
+    representations that map to roots of unity (Discrete Fourier Transform).
 
-    Based on Chan et al. (2023) — grokking involves learning discrete Fourier transform.
+    Args:
+        model: The trained ModularArithmeticTransformer.
+        prime: The modulus used.
+
+    Returns:
+        A dictionary containing spectral concentration metrics, effective rank,
+        and dominant frequencies.
     """
     # Token embedding Fourier spectrum
     W = model.token_embed.weight.detach()  # (prime, d_model)
@@ -233,7 +266,19 @@ def compare_conditions_across_checkpoints(
     prime: int = 59,
     device: str = "cpu",
 ):
-    """Load checkpoints from each condition and analyze circuit formation."""
+    """
+    Load intermediate checkpoints for a list of conditions and compute
+    Fourier circuit properties and weight norms over time.
+
+    Args:
+        conditions: List of directory names (e.g., ['pure', 'severe_collapse']).
+        results_dir: Base directory where outputs are saved.
+        prime: The modulus parameter.
+        device: The compute device.
+
+    Returns:
+        A nested dictionary mapping condition -> checkpoint steps -> metrics.
+    """
     results = {}
 
     for cond in conditions:
@@ -303,7 +348,24 @@ def run_full_analysis(
     prime: int = 59,
     device: str = "cpu",
 ):
-    """Run the full mechanistic analysis pipeline."""
+    """
+    Run the complete mechanistic analysis pipeline:
+    1. Compare Fourier circuit formation trajectories.
+    2. Train SAEs on normal vs collapsed representations to compare sparsity.
+    3. Run TracIn data attribution to find highly influential samples.
+
+    Results are aggregated and saved to `analysis_output/mechanistic_analysis.json`.
+
+    Args:
+        conditions: List of experiment names to analyze.
+        results_dir: Directory containing trained model checkpoints.
+        output_dir: Directory to save the final analysis output.
+        prime: Modulus parameter.
+        device: Compute device.
+
+    Returns:
+        A dictionary containing all combined analysis metrics.
+    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 

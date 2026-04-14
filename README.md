@@ -2,29 +2,33 @@
 
 Can transformer models exhibit grokking (delayed generalization) when trained on data that has undergone varying degrees of distributional narrowing (simulating model collapse)?
 
+## Experiment Design & Hypotheses
+This repository investigates the interplay between model collapse (degenerative training on synthetic data) and grokking.
+We test five conditions of "collapse" on a modular arithmetic task: `pure`, `low_collapse`, `medium_collapse`, `high_collapse`, and `severe_collapse`.
+
+**Hypotheses**:
+1. Grokking requires clean, well-distributed data to form the necessary Fourier circuits.
+2. Contaminating the dataset with collapsed data (narrowed distribution, errors) delays or completely prevents grokking, even if the model can still memorize the training data.
+
 ## Quick Start
 
 ```bash
 # Install dependencies
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib seaborn hydra-core pyyaml
+uv pip install torch numpy matplotlib
 
-# Run a single condition (pure data) using Hydra Configuration
-python src/train.py condition_name=pure max_steps=50000
+# Run a single condition (pure data)
+python src/train.py --condition pure --max-steps 50000
 
 # Run all conditions
-python src/train.py condition_name=all max_steps=50000
+python src/train.py --all --max-steps 50000
 
-# Analyze results and progress metrics
+# You can also use a YAML configuration file
+# python src/train.py --config config.yaml
+
+# Analyze results and generate visualizations
 python src/progress_measures.py results/
 python src/analysis.py results/
-
-# Run mechanistic/data attribution analyses
-python src/data_attribution.py --results-dir results --output-dir analysis_output
-python src/mechanistic_analysis.py --results-dir results --output-dir analysis_output
-
-# Generate Visualizations (Heatmaps, Capability Emergence, Dashboards)
-python scripts/visualize.py --results-dir results --output-dir analysis_output/plots
 ```
 
 ## Experimental Conditions
@@ -44,14 +48,12 @@ python scripts/visualize.py --results-dir results --output-dir analysis_output/p
 - **Embedding rank**: Effective rank of learned representations
 - **Weight norm**: Total parameter norm (decreases during grokking)
 - **Grokking delay**: Steps between memorization and generalization
-- **Data Attribution (TracIn)**: Understanding poison pills impacting Grokking
 
 ## Architecture
 
 - 1-layer transformer, 128 hidden dim, 4 attention heads
 - Modular arithmetic task: (a + b) mod 59
 - AdamW optimizer with weight decay = 1.0 (critical for grokking)
-- Configuration powered by `Hydra` & `OmegaConf`
 
 ## References
 

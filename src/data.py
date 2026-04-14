@@ -1,5 +1,6 @@
 """
 Data generation for grokking-collapse experiments.
+
 Generates modular arithmetic datasets with varying levels of synthetic data contamination
 to simulate model collapse.
 """
@@ -13,6 +14,7 @@ from typing import Optional, Tuple
 @dataclass
 class DatasetConfig:
     """Configuration for dataset generation."""
+
     prime: int = 59  # Modular arithmetic modulus
     train_fraction: float = 0.3  # Fraction of data for training
     collapse_level: float = 0.0  # Fraction of training data replaced by synthetic

@@ -1,5 +1,6 @@
 """
 Progress measures for grokking analysis.
+
 Based on Chan et al. (2023) "Progress Measures for Grokking via Mechanistic Interpretability"
 """
 
@@ -19,6 +20,7 @@ def load_results(condition_dir: Path) -> Dict:
 def compute_excluded_loss(history: List[Dict], prime: int = 59) -> List[float]:
     """
     Compute excluded loss — the loss attributable to specific Fourier components.
+
     This is a progress measure from Chan et al.
     
     High excluded loss = model relies on those components = circuit formation in progress.
@@ -36,6 +38,7 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
                             threshold: float = 0.9) -> Optional[int]:
     """
     Detect the step at which a phase transition occurs.
+
     Returns the step number or None if no transition detected.
     """
     for entry in history:

@@ -1,6 +1,4 @@
-"""
-Training loop with grokking detection and progress measures.
-"""
+"""Training loop with grokking detection and progress measures."""
 
 import torch
 import torch.nn as nn
@@ -8,11 +6,15 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
-import os
+import hydra
+from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from typing import Optional, List
+from typing import Optional, List, Tuple, Dict
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from model import ModularArithmeticTransformer
 from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
 
@@ -20,6 +22,7 @@ from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
 @dataclass
 class TrainConfig:
     """Training configuration."""
+
     # Model
     prime: int = 59
     d_model: int = 128
@@ -51,6 +54,7 @@ class TrainConfig:
 @dataclass
 class TrainState:
     """Tracks training state and metrics."""
+
     step: int = 0
     train_loss: float = float('inf')
     test_loss: float = float('inf')
@@ -68,6 +72,7 @@ class TrainState:
 def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: int = 5) -> float:
     """
     Measure how concentrated the Fourier spectrum is on the top-k frequencies.
+
     High concentration → grokking has occurred (or is occurring).
     """
     spectrum = model.get_embedding_fourier_spectrum()  # (prime, d_model)
@@ -252,78 +257,66 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(config: DictConfig) -> Dict:
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}
-    
+
     for name, data_config in conditions.items():
         print(f"\n{'='*60}")
         print(f"Running condition: {name}")
         print(f"{'='*60}")
-        
-        train_config = TrainConfig(
-            collapse_level=data_config.collapse_level,
-            collapse_severity=data_config.collapse_severity,
-            condition_name=name,
-            output_dir=output_dir,
-            max_steps=max_steps,
+
+        cond_config = OmegaConf.merge(
+            config,
+            {"condition_name": name,
+             "collapse_level": data_config.collapse_level,
+             "collapse_severity": data_config.collapse_severity}
         )
-        
-        state = train(train_config)
+
+        state = train(cond_config)
         results[name] = {
             "grokked": state.grokked,
             "grokking_step": state.grokking_step,
             "final_test_acc": state.test_acc,
             "fourier_concentration": state.fourier_concentration,
         }
-    
+
     # Summary
     print(f"\n{'='*60}")
     print("SUMMARY")
     print(f"{'='*60}")
     for name, r in results.items():
         status = "✅ GROKKED" if r["grokked"] else "❌ NO GROK"
-        print(f"  {name:20s} | {status} | step={r['grokking_step']} | "
-              f"test_acc={r['final_test_acc']:.4f} | fourier={r['fourier_concentration']:.3f}")
-    
+        print(
+            f"  {name:20s} | {status} | step={r['grokking_step']} | "
+            f"test_acc={r['final_test_acc']:.4f} | "
+            f"fourier={r['fourier_concentration']:.3f}"
+        )
+
     return results
 
-
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--condition", type=str, default=None,
-                       help="Run specific condition (pure/low/medium/high/severe)")
-    parser.add_argument("--all", action="store_true", help="Run all conditions")
-    parser.add_argument("--max-steps", type=int, default=50000)
-    parser.add_argument("--output-dir", type=str, default="results")
-    args = parser.parse_args()
-    
-    if args.all:
-        run_all_conditions(args.output_dir, args.max_steps)
-    elif args.condition:
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig):
+    """Execute main training block using Hydra config."""
+    if cfg.condition_name == "all":
+        run_all_conditions(cfg)
+    else:
         conditions = get_all_conditions()
-        # Match partial names
         matched = None
-        for name, config in conditions.items():
-            if args.condition.lower() in name:
+        for name, config_data in conditions.items():
+            if cfg.condition_name.lower() in name:
                 matched = name
                 break
+
         if matched:
-            config = conditions[matched]
-            train_config = TrainConfig(
-                collapse_level=config.collapse_level,
-                collapse_severity=config.collapse_severity,
-                condition_name=matched,
-                output_dir=args.output_dir,
-                max_steps=args.max_steps,
-            )
-            train(train_config)
+            cfg.condition_name = matched
+            cfg.collapse_level = conditions[matched].collapse_level
+            cfg.collapse_severity = conditions[matched].collapse_severity
+            train(cfg)
         else:
-            print(f"Unknown condition: {args.condition}")
-            print(f"Available: {list(conditions.keys())}")
-    else:
-        # Default: run pure condition
-        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
-        train(train_config)
+            print(f"Unknown condition: {cfg.condition_name}")
+            print(f"Available: {list(conditions.keys())} or 'all'")
+
+if __name__ == "__main__":
+    main()

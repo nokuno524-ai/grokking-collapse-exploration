@@ -1,5 +1,6 @@
 """
 Mechanistic analysis of grokking-collapse interplay.
+
 Uses SAE-inspired feature analysis and data attribution to understand WHY collapse kills grokking.
 
 Three-pronged approach:
@@ -28,7 +29,9 @@ from data import generate_modular_arithmetic, DatasetConfig
 
 class FeatureSAE(nn.Module):
     """Simple TopK SAE to decompose transformer hidden states."""
+
     def __init__(self, d_model: int, n_features: int, k: int = 32):
+        """Initialize the SAE."""
         super().__init__()
         self.d_model = d_model
         self.n_features = n_features
@@ -41,6 +44,7 @@ class FeatureSAE(nn.Module):
             self.decoder.weight.div_(self.decoder.weight.norm(dim=0, keepdim=True) + 1e-8)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Perform forward pass mapping to sparse representation and reconstructing."""
         pre_acts = self.encoder(x)
         # TopK activation
         topk_vals, topk_idx = torch.topk(pre_acts, self.k, dim=-1)
@@ -50,6 +54,7 @@ class FeatureSAE(nn.Module):
         return recon, acts
 
     def loss(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Calculate reconstruction loss."""
         recon, acts = self.forward(x)
         recon_loss = F.mse_loss(recon, x)
         l0 = (acts > 0).float().mean()
@@ -118,10 +123,11 @@ def compute_tracin_scores(
     device: str = "cpu",
 ) -> torch.Tensor:
     """
-    Compute TracIn-style influence scores: how much does each training example
-    contribute to the loss on test examples?
+    Compute TracIn-style influence scores.
 
-    TracIn = sum over checkpoints of: grad_z_train · grad_z_test
+    How much does each training example contribute to the loss on test examples?
+
+    TracIn = sum over checkpoints of: grad_z_train · grad_z_test.
 
     Returns: (n_test, n_train) influence matrix
     """
@@ -170,6 +176,7 @@ def compute_tracin_scores(
 def analyze_fourier_circuit(model: ModularArithmeticTransformer, prime: int = 59) -> Dict:
     """
     Analyze the Fourier structure of the embedding and attention layers.
+
     Based on Chan et al. (2023) — grokking involves learning discrete Fourier transform.
     """
     # Token embedding Fourier spectrum

@@ -1,5 +1,6 @@
 """
 Small transformer model for modular arithmetic tasks.
+
 Based on the architecture from Power et al. (2022) and Chan et al. (2023).
 """
 
@@ -31,6 +32,7 @@ class ModularArithmeticTransformer(nn.Module):
         n_layers: int = 1,
         dropout: float = 0.0,
     ):
+        """Initialize the ModularArithmeticTransformer."""
         super().__init__()
         self.prime = prime
         self.d_model = d_model
@@ -110,6 +112,7 @@ class ModularArithmeticTransformer(nn.Module):
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
+
         Returns the magnitude of the DFT of each embedding dimension.
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)

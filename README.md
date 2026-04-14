@@ -7,17 +7,24 @@ Can transformer models exhibit grokking (delayed generalization) when trained on
 ```bash
 # Install dependencies
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib
+uv pip install torch numpy matplotlib seaborn hydra-core pyyaml
 
-# Run a single condition (pure data)
-python src/train.py --condition pure --max-steps 50000
+# Run a single condition (pure data) using Hydra Configuration
+python src/train.py condition_name=pure max_steps=50000
 
 # Run all conditions
-python src/train.py --all --max-steps 50000
+python src/train.py condition_name=all max_steps=50000
 
-# Analyze results
+# Analyze results and progress metrics
 python src/progress_measures.py results/
 python src/analysis.py results/
+
+# Run mechanistic/data attribution analyses
+python src/data_attribution.py --results-dir results --output-dir analysis_output
+python src/mechanistic_analysis.py --results-dir results --output-dir analysis_output
+
+# Generate Visualizations (Heatmaps, Capability Emergence, Dashboards)
+python scripts/visualize.py --results-dir results --output-dir analysis_output/plots
 ```
 
 ## Experimental Conditions
@@ -37,12 +44,14 @@ python src/analysis.py results/
 - **Embedding rank**: Effective rank of learned representations
 - **Weight norm**: Total parameter norm (decreases during grokking)
 - **Grokking delay**: Steps between memorization and generalization
+- **Data Attribution (TracIn)**: Understanding poison pills impacting Grokking
 
 ## Architecture
 
 - 1-layer transformer, 128 hidden dim, 4 attention heads
 - Modular arithmetic task: (a + b) mod 59
 - AdamW optimizer with weight decay = 1.0 (critical for grokking)
+- Configuration powered by `Hydra` & `OmegaConf`
 
 ## References
 

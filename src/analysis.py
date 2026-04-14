@@ -1,6 +1,4 @@
-"""
-Visualization and analysis utilities for grokking-collapse experiments.
-"""
+"""Visualization and analysis utilities for grokking-collapse experiments."""
 
 import json
 import numpy as np

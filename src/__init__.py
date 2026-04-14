@@ -1,1 +1,1 @@
-# Grokking-Collapse Experiment Code
+"""Grokking-Collapse Experiment Code."""

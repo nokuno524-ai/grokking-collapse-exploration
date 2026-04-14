@@ -1,5 +1,6 @@
 """
 Deep data attribution investigation.
+
 Focus: which specific training examples are poison pills for grokking?
 """
 
@@ -89,6 +90,8 @@ def grad_based_attribution(
     device: str = "cpu",
 ):
     """
+    Compute gradient attributions for each training example.
+
     For each training example, compute:
     1. Loss gradient norm (how much it pushes the model)
     2. Gradient direction similarity to the "correct" gradient

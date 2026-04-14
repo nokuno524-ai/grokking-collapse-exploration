@@ -33,7 +33,7 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
         print("matplotlib not available, skipping plots")
         return
     
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    fig, axes = plt.subplots(3, 3, figsize=(18, 15))
     metrics = [
         ("train_loss", "Train Loss"),
         ("test_loss", "Test Loss"),
@@ -41,6 +41,9 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
         ("weight_norm", "Weight Norm"),
         ("embedding_rank", "Embedding Rank"),
         ("fourier_concentration", "Fourier Concentration"),
+        ("mode_collapse", "Mode Collapse"),
+        ("kl_div", "KL Divergence"),
+        ("memorization", "Memorization Score"),
     ]
     
     colors = {

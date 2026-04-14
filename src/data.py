@@ -74,6 +74,18 @@ def apply_collapse(
     - Narrowed output distribution (favors common results)
     - Occasional errors (assigns probability mass incorrectly)
     - Loss of rare outputs
+
+    Args:
+        pairs: List of input (a, b) pairs.
+        targets: List of target values corresponding to the pairs.
+        prime: The modulus (prime number) used for the arithmetic.
+        collapse_level: Fraction of training targets to be replaced (0.0 to 1.0).
+        collapse_severity: Controls the temperature of the output distribution (0.0 = no peak, 1.0 = sharp peak).
+        rng: A numpy random state for reproducibility.
+
+    Returns:
+        A tuple of (new_pairs, new_targets), where some percentage of the targets
+        have been replaced with samples from the artificially collapsed distribution.
     """
     n_replace = int(len(targets) * collapse_level)
     replace_idx = rng.choice(len(targets), n_replace, replace=False)
@@ -89,7 +101,7 @@ def apply_collapse(
     temp = max(0.1, 1.0 - collapse_severity)
     collapsed_probs = {}
     for t in range(prime):
-        base_prob = freq.get(t, 1.0 / prime)
+        base_prob = freq.get(t, 0.0)
         collapsed_probs[t] = base_prob ** (1.0 / temp)
     
     # Normalize

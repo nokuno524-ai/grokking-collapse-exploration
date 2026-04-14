@@ -2,6 +2,14 @@
 
 Can transformer models exhibit grokking (delayed generalization) when trained on data that has undergone varying degrees of distributional narrowing (simulating model collapse)?
 
+## Experiment Design & Hypotheses
+This repository investigates the interplay between model collapse (degenerative training on synthetic data) and grokking.
+We test five conditions of "collapse" on a modular arithmetic task: `pure`, `low_collapse`, `medium_collapse`, `high_collapse`, and `severe_collapse`.
+
+**Hypotheses**:
+1. Grokking requires clean, well-distributed data to form the necessary Fourier circuits.
+2. Contaminating the dataset with collapsed data (narrowed distribution, errors) delays or completely prevents grokking, even if the model can still memorize the training data.
+
 ## Quick Start
 
 ```bash
@@ -15,7 +23,10 @@ python src/train.py --condition pure --max-steps 50000
 # Run all conditions
 python src/train.py --all --max-steps 50000
 
-# Analyze results
+# You can also use a YAML configuration file
+# python src/train.py --config config.yaml
+
+# Analyze results and generate visualizations
 python src/progress_measures.py results/
 python src/analysis.py results/
 ```

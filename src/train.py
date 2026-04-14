@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-import random
-import numpy as np
 import json
 import time
 import os
@@ -17,13 +15,48 @@ from typing import Optional, List
 
 from model import ModularArithmeticTransformer
 from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
-from config import TrainConfig, load_config
-import metrics
+
+
+@dataclass
+class TrainConfig:
+    """
+    Configuration for model architecture, training hyperparameters, and dataset generation.
+    Can be used to specify different collapse conditions to study their impact on grokking.
+    """
+    # Model
+    prime: int = 59
+    d_model: int = 128
+    n_heads: int = 4
+    d_ff: int = 512
+    n_layers: int = 1
+    
+    # Training
+    max_steps: int = 50000
+    lr: float = 1e-3
+    weight_decay: float = 1.0  # Key hyperparameter for grokking!
+    batch_size: int = 512
+    
+    # Logging
+    eval_every: int = 100
+    log_every: int = 50
+    save_every: int = 5000
+    
+    # Data
+    collapse_level: float = 0.0
+    collapse_severity: float = 0.5
+    seed: int = 42
+    
+    # Output
+    output_dir: str = "results"
+    condition_name: str = "default"
 
 
 @dataclass
 class TrainState:
-    """Tracks training state and metrics."""
+    """
+    Tracks training metrics over time and stores the history of the run.
+    Records milestones such as the specific step where grokking occurs.
+    """
     step: int = 0
     train_loss: float = float('inf')
     test_loss: float = float('inf')
@@ -38,31 +71,47 @@ class TrainState:
     history: List[dict] = field(default_factory=list)
 
 
-def set_seed(seed: int):
-    """Set all random seeds for perfect reproducibility."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: int = 5) -> float:
+    """
+    Measure how concentrated the Fourier spectrum of the token embedding is on the top-k frequencies.
+    High concentration → grokking has occurred (or is occurring), representing circuit formation.
 
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
+    Args:
+        model: The transformer model.
+        top_k: Number of highest energy frequencies to measure against the total.
+
+    Returns:
+        A float between 0 and 1 indicating the fraction of energy in the top-k frequencies
+        (excluding the DC component).
+    """
+    spectrum = model.get_embedding_fourier_spectrum()  # (prime, d_model)
+    # Average across embedding dimensions
+    avg_spectrum = spectrum.mean(dim=1)  # (prime,)
+    # Exclude DC component
+    avg_spectrum = avg_spectrum[1:]
+    total_energy = avg_spectrum.sum()
+    if total_energy < 1e-10:
+        return 0.0
+    top_energy = avg_spectrum.topk(min(top_k, len(avg_spectrum))).values.sum()
+    return (top_energy / total_energy).item()
 
 
 def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy, preds, targets)."""
+    """
+    Evaluate the model on a given dataset.
+
+    Args:
+        model: The transformer model to evaluate.
+        dataloader: DataLoader containing the dataset pairs and targets.
+        device: The device to perform the evaluation on.
+
+    Returns:
+        A tuple of (average_loss, accuracy).
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
     total = 0
-    all_preds = []
-    all_targets = []
     
     with torch.no_grad():
         for inputs, targets in dataloader:
@@ -73,20 +122,46 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
-            all_preds.append(preds)
-            all_targets.append(targets)
     
-    return total_loss / total, correct / total, torch.cat(all_preds), torch.cat(all_targets)
+    return total_loss / total, correct / total
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment under a specific configuration.
+
+    This function sets up the data generators, creates the model, and runs the training
+    loop. It periodically evaluates the model, calculates progress measures, detects
+    the grokking threshold, and saves checkpoints.
+
+    Args:
+        config: The configuration object for the experiment.
+
+    Returns:
+        A TrainState object containing the final metrics, grokking milestones,
+        and the full training history.
+    """
+    # Try to initialize tensorboard/wandb
+    try:
+        from torch.utils.tensorboard import SummaryWriter
+        tb_writer = SummaryWriter(log_dir=f"{config.output_dir}/{config.condition_name}/logs")
+    except ImportError:
+        tb_writer = None
+
+    try:
+        import wandb
+        if wandb.run is None:
+            # Only init if not already initialized (e.g. by external wrapper)
+            wandb.init(project="grokking-collapse", name=config.condition_name, config=asdict(config), mode="disabled") # Set to disabled to act as stub unless user configures
+    except ImportError:
+        pass
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
     
     # Set seeds
-    set_seed(config.seed)
+    torch.manual_seed(config.seed)
     
     # Generate data
     data_config = DatasetConfig(
@@ -99,13 +174,12 @@ def train(config: TrainConfig) -> TrainState:
     
     train_dataset = TensorDataset(train_in, train_tgt)
     test_dataset = TensorDataset(test_in, test_tgt)
-
-    g = torch.Generator()
-    g.manual_seed(config.seed)
-
-    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, worker_init_fn=seed_worker, generator=g)
+    train_loader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
     
+    # Set seed right before model creation to ensure consistent weight init across conditions
+    torch.manual_seed(config.seed)
+
     # Create model
     model = ModularArithmeticTransformer(
         prime=config.prime,
@@ -159,8 +233,8 @@ def train(config: TrainConfig) -> TrainState:
         
         # Evaluate periodically
         if step % config.eval_every == 0:
-            train_loss, train_acc, _, _ = evaluate(model, train_loader, device)
-            test_loss, test_acc, test_preds, test_targets = evaluate(model, test_loader, device)
+            train_loss, train_acc = evaluate(model, train_loader, device)
+            test_loss, test_acc = evaluate(model, test_loader, device)
             
             state.train_loss = train_loss
             state.test_loss = test_loss
@@ -168,12 +242,7 @@ def train(config: TrainConfig) -> TrainState:
             state.test_acc = test_acc
             state.weight_norm = model.get_weight_norm()
             state.embedding_rank = model.get_embedding_rank()
-            state.fourier_concentration = metrics.compute_fourier_concentration(model)
-
-            mode_collapse = metrics.mode_collapse_score(test_preds, config.prime)
-            kl_div = metrics.kl_divergence_shift(test_preds, test_targets, config.prime)
-            loss_of_complexity = metrics.loss_of_complexity(model)
-            memorization = metrics.memorization_score(train_acc, test_acc)
+            state.fourier_concentration = compute_fourier_concentration(model)
             
             # Detect grokking
             if test_acc >= state.grokking_threshold and not state.grokked:
@@ -191,10 +260,6 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
-                "mode_collapse": mode_collapse,
-                "kl_div": kl_div,
-                "loss_of_complexity": loss_of_complexity,
-                "memorization": memorization,
             }
             state.history.append(entry)
             
@@ -208,6 +273,20 @@ def train(config: TrainConfig) -> TrainState:
                     f"fourier={state.fourier_concentration:.3f} | "
                     f"time={elapsed:.1f}s"
                 )
+
+                # Tensorboard log
+                if tb_writer:
+                    for k, v in entry.items():
+                        if k != "step":
+                            tb_writer.add_scalar(k, v, step)
+
+                # Wandb log
+                try:
+                    import wandb
+                    if wandb.run is not None:
+                        wandb.log(entry)
+                except ImportError:
+                    pass
         
         # Save checkpoint
         if step % config.save_every == 0:
@@ -243,7 +322,18 @@ def train(config: TrainConfig) -> TrainState:
 
 
 def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
-    """Run all experimental conditions."""
+    """
+    Run all predefined experimental conditions to compare how varying levels of
+    synthetic data collapse affect grokking delays and metrics.
+
+    Args:
+        output_dir: Base directory to save the experiment results and checkpoints.
+        max_steps: Total training steps for each condition.
+
+    Returns:
+        A dictionary mapping condition names to their high-level results (grokked status,
+        grokking step, final accuracy, etc).
+    """
     conditions = get_all_conditions()
     results = {}
     
@@ -282,21 +372,24 @@ def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
 
 if __name__ == "__main__":
     import argparse
+    import yaml
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default=None,
+                       help="Path to YAML configuration file")
     parser.add_argument("--condition", type=str, default=None,
                        help="Run specific condition (pure/low/medium/high/severe)")
     parser.add_argument("--all", action="store_true", help="Run all conditions")
     parser.add_argument("--max-steps", type=int, default=50000)
     parser.add_argument("--output-dir", type=str, default="results")
-    parser.add_argument("--config", type=str, default=None, help="Path to yaml config file")
     args = parser.parse_args()
     
     if args.config:
-        train_config = load_config(args.config)
+        with open(args.config, "r") as f:
+            yaml_config = yaml.safe_load(f)
+        train_config = TrainConfig(**yaml_config)
+        # Override output_dir if specified in args
         if args.output_dir != "results":
             train_config.output_dir = args.output_dir
-        if args.max_steps != 50000:
-            train_config.max_steps = args.max_steps
         train(train_config)
     elif args.all:
         run_all_conditions(args.output_dir, args.max_steps)
@@ -323,5 +416,5 @@ if __name__ == "__main__":
             print(f"Available: {list(conditions.keys())}")
     else:
         # Default: run pure condition
-        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir, max_steps=args.max_steps)
+        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
         train(train_config)

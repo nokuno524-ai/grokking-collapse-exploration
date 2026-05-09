@@ -49,7 +49,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 DEFAULT_DATA_ROOT = Path("/scratch/qzp4ta/grokking-collapse/data/contaminated_real")
 N_DOCS = 200_000
 TRAIN_FRAC = 0.95
-MAX_SEQ_LEN = 1024
+MAX_SEQ_LEN = 1024  # may be overridden by --max-seq-len CLI flag
 PROMPT_LEN = 64
 GEN_LEN = 960
 GEN_BATCH_SIZE = 4
@@ -152,13 +152,20 @@ def generate_ai_docs(
     gen_model,
     device: torch.device,
     seed: int,
-    batch_size: int = GEN_BATCH_SIZE,
-    prompt_len: int = PROMPT_LEN,
-    max_new_tokens: int = GEN_LEN,
+    batch_size: Optional[int] = None,
+    prompt_len: Optional[int] = None,
+    max_new_tokens: Optional[int] = None,
     temperature: float = 0.9,
     top_p: float = 0.95,
 ) -> Dataset:
     """Generate AI continuations for the rows referenced by `indices`."""
+    # Resolve dynamic defaults so callers pick up CLI overrides.
+    if batch_size is None:
+        batch_size = GEN_BATCH_SIZE
+    if prompt_len is None:
+        prompt_len = PROMPT_LEN
+    if max_new_tokens is None:
+        max_new_tokens = GEN_LEN
     gen_model.eval()
     pad_id = tokenizer.pad_token_id
     eos_id = tokenizer.eos_token_id
@@ -360,6 +367,9 @@ def make_mixture(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    # Declared up-front so the parser defaults (which reference these globals)
+    # are valid before the override block reassigns them.
+    global MAX_SEQ_LEN, PROMPT_LEN, GEN_LEN, GEN_BATCH_SIZE
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ratios", type=float, nargs="+",
                         default=list(DEFAULT_RATIOS),
@@ -379,10 +389,20 @@ def main() -> None:
                         help="Do not stream OpenWebText (load full split)")
     parser.add_argument("--gen-batch-size", type=int, default=GEN_BATCH_SIZE)
     parser.add_argument("--max-new-tokens", type=int, default=GEN_LEN)
+    parser.add_argument("--max-seq-len", type=int, default=MAX_SEQ_LEN,
+                        help="Max sequence length for tokenization & generation outputs")
+    parser.add_argument("--prompt-len", type=int, default=PROMPT_LEN,
+                        help="Prompt length used to seed AI continuations")
     args = parser.parse_args()
 
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
     set_seed(0)
+
+    # Override module-level constants so downstream helpers see the new sizes.
+    MAX_SEQ_LEN = int(args.max_seq_len)
+    PROMPT_LEN = min(int(args.prompt_len), max(1, MAX_SEQ_LEN // 4))
+    GEN_LEN = max(1, min(int(args.max_new_tokens), MAX_SEQ_LEN - PROMPT_LEN))
+    GEN_BATCH_SIZE = int(args.gen_batch_size)
 
     data_root = Path(args.data_root)
     data_root.mkdir(parents=True, exist_ok=True)

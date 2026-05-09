@@ -17,6 +17,7 @@ class DatasetConfig:
     train_fraction: float = 0.3  # Fraction of data for training
     collapse_level: float = 0.0  # Fraction of training data replaced by synthetic
     collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
+    noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
     seed: int = 42
 
 
@@ -50,10 +51,17 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     # Apply collapse: replace some training examples with "collapsed" outputs
     if config.collapse_level > 0:
         train_pairs, train_targets_list = apply_collapse(
-            train_pairs, train_targets_list, p, 
+            train_pairs, train_targets_list, p,
             config.collapse_level, config.collapse_severity, rng
         )
-    
+
+    # Apply uniform random label noise (baseline ablation, mutually independent of collapse)
+    if config.noise_fraction > 0:
+        train_pairs, train_targets_list = apply_label_noise(
+            train_pairs, train_targets_list, p,
+            config.noise_fraction, rng,
+        )
+
     # Convert to tensors
     train_inputs = torch.tensor(train_pairs, dtype=torch.long)
     train_targets = torch.tensor(train_targets_list, dtype=torch.long)
@@ -110,6 +118,31 @@ def apply_collapse(
         # Optionally also corrupt the pair (simulating input collapse)
         # For now, keep inputs clean — only corrupt outputs
     
+    return new_pairs, new_targets
+
+
+def apply_label_noise(
+    pairs: list, targets: list, prime: int,
+    noise_fraction: float, rng: np.random.RandomState,
+) -> Tuple[list, list]:
+    """
+    Replace a fraction of training labels with uniform random labels in [0, prime).
+    The new label is drawn uniformly from the (prime-1) values different from the original
+    so the corruption is always observable.
+    """
+    n_replace = int(len(targets) * noise_fraction)
+    if n_replace == 0:
+        return list(pairs), list(targets)
+    replace_idx = rng.choice(len(targets), n_replace, replace=False)
+
+    new_pairs = list(pairs)
+    new_targets = list(targets)
+    for idx in replace_idx:
+        original = new_targets[idx]
+        candidate = int(rng.randint(0, prime - 1))
+        if candidate >= original:
+            candidate += 1
+        new_targets[idx] = candidate
     return new_pairs, new_targets
 
 

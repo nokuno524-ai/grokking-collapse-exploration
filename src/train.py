@@ -47,6 +47,8 @@ class TrainConfig:
     # Data
     collapse_level: float = 0.0
     collapse_severity: float = 0.5
+    train_fraction: float = 0.3
+    noise_fraction: float = 0.0
     seed: int = 42
     
     # Output
@@ -121,8 +123,10 @@ def train(config: TrainConfig) -> TrainState:
     # Generate data
     data_config = DatasetConfig(
         prime=config.prime,
+        train_fraction=config.train_fraction,
         collapse_level=config.collapse_level,
         collapse_severity=config.collapse_severity,
+        noise_fraction=config.noise_fraction,
         seed=config.seed,
     )
     train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)

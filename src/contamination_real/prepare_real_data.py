@@ -432,8 +432,10 @@ def main() -> None:
     gen_model = None
     if args.mode in ("ai", "self"):
         print(f"[prepare_real_data] loading generator: {args.gen_model}", flush=True)
+        # fp16 only on CUDA; fp16 on CPU silently upcasts and is slow.
+        gen_dtype = torch.float16 if device.type == "cuda" else torch.float32
         gen_model = AutoModelForCausalLM.from_pretrained(
-            args.gen_model, torch_dtype=torch.float16
+            args.gen_model, torch_dtype=gen_dtype
         ).to(device)
         gen_model.eval()
 

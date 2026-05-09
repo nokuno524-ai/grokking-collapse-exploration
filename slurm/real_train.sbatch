@@ -2,27 +2,31 @@
 #SBATCH --job-name=real-train
 #SBATCH --account=zhangmlgroup
 #SBATCH --partition=gpu-a40,gpu-a6000,gpu-a100
-#SBATCH --gres=gpu:1
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=48G
-#SBATCH --time=20:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --mem=32G
+#SBATCH --time=08:00:00
+#SBATCH --array=0-17
 #SBATCH --output=/scratch/qzp4ta/grokking-collapse/logs/real-train-%A_%a.out
 #SBATCH --error=/scratch/qzp4ta/grokking-collapse/logs/real-train-%A_%a.err
-#SBATCH --array=0-17
 
-# 6 ratios × 3 seeds = 18 tasks. Index = ratio_idx * 3 + seed_idx.
+# 6 ratios x 3 seeds = 18 tasks. Index = ratio_idx * 3 + seed_idx.
 # Pass MODE=noise|scarcity|self|external as an env var to run a baseline
-# instead of the headline AI-contamination sweep.
-
-RATIOS=(0 5 15 30 50 80)
-SEEDS=(0 1 2)
-MODE=${MODE:-ai}
+# instead of the headline AI-contamination sweep, e.g.
+#   sbatch --export=ALL,MODE=noise slurm/real_train.sbatch
 
 set -e
 export PYTHONUNBUFFERED=1
 export TOKENIZERS_PARALLELISM=false
+export HF_DATASETS_TRUST_REMOTE_CODE=1
 cd /scratch/qzp4ta/grokking-collapse
 source .venv_real/bin/activate
+
+RATIOS=(0 5 15 30 50 80)
+SEEDS=(0 1 2)
+MODE=${MODE:-ai}
 
 IDX=${SLURM_ARRAY_TASK_ID:-0}
 R_IDX=$(( IDX / 3 ))

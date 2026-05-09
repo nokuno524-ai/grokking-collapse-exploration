@@ -18,6 +18,9 @@ python src/train.py --all --max-steps 50000
 # Analyze results
 python src/progress_measures.py results/
 python src/analysis.py results/
+
+# Generate simple comparison table
+python analysis/parse_results.py
 ```
 
 ## Experimental Conditions

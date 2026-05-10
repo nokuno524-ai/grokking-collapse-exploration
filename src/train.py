@@ -110,6 +110,14 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     return total_loss / total, correct / total
 
 
+import random
+import numpy as np
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
 def train(config: TrainConfig) -> TrainState:
     """Run a single training experiment."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -119,6 +127,10 @@ def train(config: TrainConfig) -> TrainState:
     # Set seeds
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
+    np.random.seed(config.seed)
+    random.seed(config.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Generate data
     data_config = DatasetConfig(
@@ -138,9 +150,9 @@ def train(config: TrainConfig) -> TrainState:
     loader_generator.manual_seed(config.seed)
     train_loader = DataLoader(
         train_dataset, batch_size=config.batch_size, shuffle=True,
-        generator=loader_generator,
+        worker_init_fn=seed_worker, generator=loader_generator,
     )
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, worker_init_fn=seed_worker)
     
     # Create model
     model = ModularArithmeticTransformer(

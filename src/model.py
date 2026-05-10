@@ -63,6 +63,7 @@ class ModularArithmeticTransformer(nn.Module):
     
     def _init_weights(self):
         """Initialize weights with small random values."""
+        # Using the currently set torch seed, the random initialisation will be deterministic.
         for module in self.modules():
             if isinstance(module, nn.Linear):
                 nn.init.normal_(module.weight, std=0.02)

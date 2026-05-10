@@ -2,6 +2,10 @@
 
 Can transformer models exhibit grokking (delayed generalization) when trained on data that has undergone varying degrees of distributional narrowing (simulating model collapse)?
 
+## Modular Experiment Framework
+
+A new, modular experiment framework has been implemented in `src/experiments` to easily manage running and tracking collapse metrics reliably. See [EXPERIMENT_FRAMEWORK.md](EXPERIMENT_FRAMEWORK.md) for details on the new config system, test runner, and weight analysis toolset.
+
 ## Quick Start
 
 ```bash

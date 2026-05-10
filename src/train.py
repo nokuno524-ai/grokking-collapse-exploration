@@ -317,6 +317,9 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=str, default="results")
     args = parser.parse_args()
     
+    # Ensure output dir exists before trying to run experiments
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+
     if args.all:
         run_all_conditions(args.output_dir, args.max_steps)
     elif args.condition:
@@ -336,11 +339,21 @@ if __name__ == "__main__":
                 output_dir=args.output_dir,
                 max_steps=args.max_steps,
             )
-            train(train_config)
+            try:
+                train(train_config)
+            except Exception as e:
+                print(f"Error during training for condition {matched}: {e}")
+                import traceback
+                traceback.print_exc()
         else:
             print(f"Unknown condition: {args.condition}")
             print(f"Available: {list(conditions.keys())}")
     else:
         # Default: run pure condition
-        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
-        train(train_config)
+        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir, max_steps=args.max_steps)
+        try:
+            train(train_config)
+        except Exception as e:
+            print(f"Error during training for condition pure: {e}")
+            import traceback
+            traceback.print_exc()

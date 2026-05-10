@@ -17,8 +17,10 @@ python src/train.py --all --max-steps 50000
 
 # Analyze results
 python src/progress_measures.py results/
-python src/analysis.py results/
+python scripts/analyze_existing_results.py --results-dir results
 ```
+
+For more detailed information regarding the analysis infrastructure (parsing, plotting, and reporting), please read [ANALYSIS.md](ANALYSIS.md).
 
 ## Experimental Conditions
 

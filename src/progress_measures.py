@@ -70,6 +70,76 @@ def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
     return speeds
 
 
+def memorization_phase_fourier_slope(history: List[Dict]) -> Optional[float]:
+    """Leading-indicator candidate.
+
+    The audit found that `fourier_concentration` is a *lagging* indicator at
+    our resolution: it crosses a threshold concurrent with test_acc, not
+    before. But the *slope* of fourier_concentration during the memorization
+    phase (after train_acc ≥ 0.99 and before test_acc ≥ 0.95) might be
+    predictive — high slope means circuit formation is already underway while
+    test_acc is still flat.
+
+    Returns the per-1000-step slope of fourier_concentration over the
+    memorization-only window, or None if that window has fewer than 3 points.
+
+    A pre-registered claim to test on held-out runs: runs that grok have
+    significantly larger memorization-phase Fourier slopes than runs that
+    fail to grok.
+    """
+    if not history:
+        return None
+    mem_idx = None
+    grok_idx = None
+    for i, e in enumerate(history):
+        if mem_idx is None and e.get("train_acc", 0) >= 0.99:
+            mem_idx = i
+        if e.get("test_acc", 0) >= 0.95:
+            grok_idx = i
+            break
+    if mem_idx is None:
+        return None
+    end_idx = grok_idx if grok_idx is not None else len(history) - 1
+    window = history[mem_idx:end_idx + 1]
+    if len(window) < 3:
+        return None
+    steps = np.array([e["step"] for e in window], dtype=float)
+    fc = np.array([e.get("fourier_concentration", 0.0) for e in window], dtype=float)
+    # OLS slope per 1000 steps
+    A = np.column_stack([np.ones_like(steps), steps])
+    sol, *_ = np.linalg.lstsq(A, fc, rcond=None)
+    slope_per_step = float(sol[1])
+    return slope_per_step * 1000.0
+
+
+def weight_norm_decay_slope(history: List[Dict]) -> Optional[float]:
+    """Leading-indicator candidate #2.
+
+    Weight norm peaks during memorization and falls during cleanup. The slope
+    of ``log(weight_norm)`` post-memorization-completion has been argued
+    (Liu 2022, Chan 2023) to be a more reliable signal than Fourier
+    concentration. Returns slope per 1000 steps in log-space, or None if the
+    post-mem window is too short.
+    """
+    if not history:
+        return None
+    mem_idx = None
+    for i, e in enumerate(history):
+        if e.get("train_acc", 0) >= 0.99:
+            mem_idx = i
+            break
+    if mem_idx is None:
+        return None
+    window = history[mem_idx:]
+    if len(window) < 5:
+        return None
+    steps = np.array([e["step"] for e in window], dtype=float)
+    wn = np.array([max(e.get("weight_norm", 1e-3), 1e-3) for e in window], dtype=float)
+    A = np.column_stack([np.ones_like(steps), steps])
+    sol, *_ = np.linalg.lstsq(A, np.log(wn), rcond=None)
+    return float(sol[1]) * 1000.0
+
+
 def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     """
     Analyze the full grokking trajectory, identifying phases.
@@ -119,6 +189,8 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
         "max_weight_norm": max_weight_norm,
         "min_weight_norm": min_weight_norm,
         "weight_norm_reduction": max_weight_norm - min_weight_norm,
+        "memorization_phase_fourier_slope": memorization_phase_fourier_slope(history),
+        "weight_norm_decay_slope": weight_norm_decay_slope(history),
     }
 
 

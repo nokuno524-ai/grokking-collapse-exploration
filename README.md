@@ -38,6 +38,9 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Visualize experiment results
+python tools/visualize_results.py results/seed_sweep --out_dir analysis/seed_sweep_plots
 ```
 
 ## Architecture

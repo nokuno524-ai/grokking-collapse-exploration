@@ -37,6 +37,7 @@ DEFAULT_TASKS = ("hellaswag", "arc_easy", "piqa", "winogrande")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def discover_checkpoints(output_dir: Path) -> List[Path]:
     """Find all per-step checkpoint dirs under `output_dir/ckpt/*/step_*`."""
     ckpt_root = output_dir / "ckpt"
@@ -97,8 +98,11 @@ def run_lm_eval(
 
     # `lm_eval` expects model_args formatted like 'pretrained=...,dtype=...'
     model_args = f"pretrained={str(model_dir)},dtype=float16"
-    print(f"[eval] running lm-eval on {model_dir} tasks={tasks} "
-          f"limit={limit} batch_size={batch_size}", flush=True)
+    print(
+        f"[eval] running lm-eval on {model_dir} tasks={tasks} "
+        f"limit={limit} batch_size={batch_size}",
+        flush=True,
+    )
     res = evaluator.simple_evaluate(
         model="hf",
         model_args=model_args,
@@ -127,22 +131,38 @@ def summarize_lm_eval(res: Dict) -> Dict[str, float]:
 # Driver
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=str, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--base-model", type=str, default="gpt2-medium")
     parser.add_argument("--tasks", type=str, nargs="+", default=list(DEFAULT_TASKS))
     parser.add_argument("--batch-size", type=int, default=8)
-    parser.add_argument("--limit", type=int, default=None,
-                        help="Limit examples per task (for fast smoke-testing)")
-    parser.add_argument("--ckpt-glob", type=str, default=None,
-                        help="Optional glob to filter checkpoint dirs (e.g. 'ratio_30_*')")
-    parser.add_argument("--final-only", action="store_true",
-                        help="Only evaluate the final checkpoint of each run")
-    parser.add_argument("--device", type=str,
-                        default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--tmp-root", type=str,
-                        default=str(Path(tempfile.gettempdir()) / "grokking_eval_tmp"))
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit examples per task (for fast smoke-testing)",
+    )
+    parser.add_argument(
+        "--ckpt-glob",
+        type=str,
+        default=None,
+        help="Optional glob to filter checkpoint dirs (e.g. 'ratio_30_*')",
+    )
+    parser.add_argument(
+        "--final-only",
+        action="store_true",
+        help="Only evaluate the final checkpoint of each run",
+    )
+    parser.add_argument(
+        "--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu"
+    )
+    parser.add_argument(
+        "--tmp-root",
+        type=str,
+        default=str(Path(tempfile.gettempdir()) / "grokking_eval_tmp"),
+    )
     args = parser.parse_args()
 
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
@@ -152,6 +172,7 @@ def main() -> None:
     ckpts = discover_checkpoints(output_dir)
     if args.ckpt_glob:
         from fnmatch import fnmatch
+
         ckpts = [c for c in ckpts if fnmatch(c.parent.name, args.ckpt_glob)]
     if args.final_only:
         # Take the highest-step checkpoint per run

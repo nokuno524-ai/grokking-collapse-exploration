@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import random
 import time
@@ -16,7 +15,6 @@ from typing import Dict, List
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import (
@@ -45,6 +43,7 @@ PROMPT_LEN = 16
 # Reproducibility
 # ---------------------------------------------------------------------------
 
+
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
@@ -57,9 +56,12 @@ def set_seed(seed: int):
 # Data
 # ---------------------------------------------------------------------------
 
+
 def collate(batch: List[Dict[str, List[int]]]) -> Dict[str, torch.Tensor]:
     input_ids = torch.tensor([b["input_ids"] for b in batch], dtype=torch.long)
-    attention_mask = torch.tensor([b["attention_mask"] for b in batch], dtype=torch.long)
+    attention_mask = torch.tensor(
+        [b["attention_mask"] for b in batch], dtype=torch.long
+    )
     return {"input_ids": input_ids, "attention_mask": attention_mask}
 
 
@@ -105,7 +107,9 @@ def build_loaders(
     return train_loader, test_loader, calibration_batch, prompt_input_ids
 
 
-def take_eval_batches(test_loader: DataLoader, n_batches: int) -> List[Dict[str, torch.Tensor]]:
+def take_eval_batches(
+    test_loader: DataLoader, n_batches: int
+) -> List[Dict[str, torch.Tensor]]:
     batches = []
     for i, b in enumerate(test_loader):
         if i >= n_batches:
@@ -117,6 +121,7 @@ def take_eval_batches(test_loader: DataLoader, n_batches: int) -> List[Dict[str,
 # ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
+
 
 def train_one(
     ratio_pct: int,
@@ -148,7 +153,10 @@ def train_one(
         tokenizer.pad_token = tokenizer.eos_token
 
     train_loader, test_loader, calib_batch, prompt_input_ids = build_loaders(
-        train_path, test_path, batch_size=batch_size, seed=seed,
+        train_path,
+        test_path,
+        batch_size=batch_size,
+        seed=seed,
     )
     eval_batches_cache = take_eval_batches(test_loader, EVAL_BATCHES)
 
@@ -185,8 +193,13 @@ def train_one(
 
     # Initial metrics at step 0
     init_metrics = compute_all_metrics(
-        model, calib_batch, eval_batches_cache, prompt_input_ids, device,
-        pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id,
+        model,
+        calib_batch,
+        eval_batches_cache,
+        prompt_input_ids,
+        device,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
     )
     init_metrics["step"] = 0
     init_metrics["lr"] = scheduler.get_last_lr()[0]
@@ -218,30 +231,42 @@ def train_one(
 
         if step % log_every == 0 or step == max_steps:
             metrics = compute_all_metrics(
-                model, calib_batch, eval_batches_cache, prompt_input_ids, device,
-                pad_token_id=tokenizer.pad_token_id, eos_token_id=tokenizer.eos_token_id,
+                model,
+                calib_batch,
+                eval_batches_cache,
+                prompt_input_ids,
+                device,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
             )
             metrics["step"] = step
             metrics["train_loss"] = float(loss.item())
             metrics["lr"] = scheduler.get_last_lr()[0]
             metrics["elapsed_s"] = time.time() - start
             history.append(metrics)
-            print(f"[train] step={step} train_loss={loss.item():.4f} "
-                  f"ppl={metrics['perplexity']:.2f} "
-                  f"rank={metrics['attn_effective_rank']:.2f} "
-                  f"H={metrics['repr_entropy']:.3f} "
-                  f"cos={metrics['cos_sim_mean']:.3f}", flush=True)
+            print(
+                f"[train] step={step} train_loss={loss.item():.4f} "
+                f"ppl={metrics['perplexity']:.2f} "
+                f"rank={metrics['attn_effective_rank']:.2f} "
+                f"H={metrics['repr_entropy']:.3f} "
+                f"cos={metrics['cos_sim_mean']:.3f}",
+                flush=True,
+            )
             with open(results_path, "w") as f:
-                json.dump({
-                    "ratio_pct": ratio_pct,
-                    "seed": seed,
-                    "max_steps": max_steps,
-                    "batch_size": batch_size,
-                    "lr": lr,
-                    "warmup_steps": warmup_steps,
-                    "weight_decay": weight_decay,
-                    "history": history,
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "ratio_pct": ratio_pct,
+                        "seed": seed,
+                        "max_steps": max_steps,
+                        "batch_size": batch_size,
+                        "lr": lr,
+                        "warmup_steps": warmup_steps,
+                        "weight_decay": weight_decay,
+                        "history": history,
+                    },
+                    f,
+                    indent=2,
+                )
 
     print(f"[train] done. results -> {results_path}", flush=True)
 
@@ -250,10 +275,15 @@ def train_one(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ratio", type=float, required=True,
-                        help="Contamination ratio (0-1 or 0-100; >1 treated as percent)")
+    parser.add_argument(
+        "--ratio",
+        type=float,
+        required=True,
+        help="Contamination ratio (0-1 or 0-100; >1 treated as percent)",
+    )
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--data-root", type=str, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--output-dir", type=str, default=DEFAULT_OUTPUT_DIR)

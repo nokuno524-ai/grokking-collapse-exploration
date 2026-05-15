@@ -35,13 +35,13 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+
+matplotlib.use("Agg")
 
 
 WINDOW_FRAC = 0.30  # fraction of post-memorization window to compute the slope on
@@ -119,12 +119,21 @@ def parse_grid(grid_dir: Path):
                 window = early_window(history)
                 if window is None:
                     continue
-                rows.append({
-                    "wd": wd, "noise": noise, "seed": seed, "grokked": grokked,
-                    "early_fourier_slope": slope_per_1000(window, "fourier_concentration"),
-                    "early_logwn_slope": slope_per_1000(window, "weight_norm", log=True),
-                    "final_test_acc": float(data.get("final_test_acc", 0.0)),
-                })
+                rows.append(
+                    {
+                        "wd": wd,
+                        "noise": noise,
+                        "seed": seed,
+                        "grokked": grokked,
+                        "early_fourier_slope": slope_per_1000(
+                            window, "fourier_concentration"
+                        ),
+                        "early_logwn_slope": slope_per_1000(
+                            window, "weight_norm", log=True
+                        ),
+                        "final_test_acc": float(data.get("final_test_acc", 0.0)),
+                    }
+                )
     return rows
 
 
@@ -137,23 +146,32 @@ def write_summary(rows: List[Dict], out_path: Path):
     wn = np.array([r["early_logwn_slope"] for r in rows])
     y = np.array([1 if r["grokked"] else 0 for r in rows])
     auc_fc = auc(fc, y)
-    auc_wn = auc(-wn, y)  # decay = negative slope, more negative ⇒ more grok-likely
+    # decay = negative slope, more negative ⇒ more grok-likely
+    auc_wn = auc(-wn, y)
     by_cell: Dict[Tuple[float, float], List[Dict]] = {}
     for r in rows:
         by_cell.setdefault((r["wd"], r["noise"]), []).append(r)
 
     lines = ["# Leading-indicator pre-registered test\n\n"]
-    lines.append(f"Window: first {int(WINDOW_FRAC*100)}% of the post-memorization "
-                 f"trajectory. Threshold: grokking := test_acc ≥ {GROK_THRESHOLD}.\n\n")
+    lines.append(
+        f"Window: first {int(WINDOW_FRAC * 100)}% of the post-memorization "
+        f"trajectory. Threshold: grokking := test_acc ≥ {GROK_THRESHOLD}.\n\n"
+    )
     lines.append("## Cell summary\n\n")
-    lines.append("| wd | noise | n_seeds | grok_rate | mean(early Fourier slope) "
-                 "| mean(early log‖W‖ slope) |\n")
+    lines.append(
+        "| wd | noise | n_seeds | grok_rate | mean(early Fourier slope) "
+        "| mean(early log‖W‖ slope) |\n"
+    )
     lines.append("|---|---|---|---|---|---|\n")
     for (w, n), lst in sorted(by_cell.items()):
         gr = sum(1 for r in lst if r["grokked"]) / len(lst)
         mfc = float(np.mean([r["early_fourier_slope"] for r in lst]))
         mwn = float(np.mean([r["early_logwn_slope"] for r in lst]))
-        lines.append(f"| {w} | {n} | {len(lst)} | {gr:.2f} | {mfc:+.5f} | {mwn:+.5f} |\n")
+        lines.append(f"| {w} | {n} | {
+                len(lst)} | {
+                gr:.2f} | {
+                mfc:+.5f} | {
+                    mwn:+.5f} |\n")
     lines.append("\n## Binary classification\n\n")
     lines.append(
         f"- AUC(early Fourier slope → grokked) = **{auc_fc:.3f}**\n"
@@ -179,12 +197,26 @@ def plot_scatter(rows: List[Dict], out_path: Path):
     wn = np.array([r["early_logwn_slope"] for r in rows])
     grok = np.array([r["grokked"] for r in rows])
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
-    for color, label, mask in [("#2ca02c", "grokked", grok),
-                                ("#d62728", "no grok", ~grok)]:
-        axes[0].scatter(fc[mask], np.zeros(mask.sum()) + np.random.uniform(-0.05, 0.05, mask.sum()),
-                        color=color, alpha=0.6, label=label, s=18)
-        axes[1].scatter(wn[mask], np.zeros(mask.sum()) + np.random.uniform(-0.05, 0.05, mask.sum()),
-                        color=color, alpha=0.6, label=label, s=18)
+    for color, label, mask in [
+        ("#2ca02c", "grokked", grok),
+        ("#d62728", "no grok", ~grok),
+    ]:
+        axes[0].scatter(
+            fc[mask],
+            np.zeros(mask.sum()) + np.random.uniform(-0.05, 0.05, mask.sum()),
+            color=color,
+            alpha=0.6,
+            label=label,
+            s=18,
+        )
+        axes[1].scatter(
+            wn[mask],
+            np.zeros(mask.sum()) + np.random.uniform(-0.05, 0.05, mask.sum()),
+            color=color,
+            alpha=0.6,
+            label=label,
+            s=18,
+        )
     axes[0].set_xlabel("early Fourier-concentration slope (per 1000 steps)")
     axes[1].set_xlabel("early log-weight-norm slope (per 1000 steps)")
     for ax in axes:
@@ -199,17 +231,15 @@ def plot_scatter(rows: List[Dict], out_path: Path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--grid-dir", type=Path,
-                    default=Path("results/exp_c_grid"))
-    ap.add_argument("--output-dir", type=Path,
-                    default=Path("analysis"))
+    ap.add_argument("--grid-dir", type=Path, default=Path("results/exp_c_grid"))
+    ap.add_argument("--output-dir", type=Path, default=Path("analysis"))
     args = ap.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows = parse_grid(args.grid_dir)
     write_summary(rows, args.output_dir / "leading_indicator_summary.md")
     plot_scatter(rows, args.output_dir / "leading_indicator_scatter.png")
-    print(f"[done] wrote {args.output_dir/'leading_indicator_summary.md'}")
-    print(f"[done] wrote {args.output_dir/'leading_indicator_scatter.png'}")
+    print(f"[done] wrote {args.output_dir / 'leading_indicator_summary.md'}")
+    print(f"[done] wrote {args.output_dir / 'leading_indicator_scatter.png'}")
 
 
 if __name__ == "__main__":

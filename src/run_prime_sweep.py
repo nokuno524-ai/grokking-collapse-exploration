@@ -34,17 +34,25 @@ DEFAULT_NOISES = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30]
 DEFAULT_SEEDS = [42, 43, 44, 45, 46]
 
 
-def fmt_p(p: int) -> str: return f"p{p}"
-def fmt_wd(wd: float) -> str: return f"wd{wd:g}"
-def fmt_noise(n: float) -> str: return f"noise{n:g}"
+def fmt_p(p: int) -> str:
+    return f"p{p}"
+
+
+def fmt_wd(wd: float) -> str:
+    return f"wd{wd:g}"
+
+
+def fmt_noise(n: float) -> str:
+    return f"noise{n:g}"
 
 
 def build_tasks(primes, wds, noises, seeds) -> List[Tuple[int, float, float, int]]:
     return [(p, w, n, s) for p in primes for w in wds for n in noises for s in seeds]
 
 
-def run_one(prime: int, wd: float, noise: float, seed: int,
-            output_root: str, max_steps: int):
+def run_one(
+    prime: int, wd: float, noise: float, seed: int, output_root: str, max_steps: int
+):
     out_dir = Path(output_root) / fmt_p(prime) / fmt_wd(wd) / fmt_noise(noise)
     cfg = TrainConfig(
         prime=prime,
@@ -64,14 +72,20 @@ def run_one(prime: int, wd: float, noise: float, seed: int,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--primes", type=str,
-                    default=",".join(str(p) for p in DEFAULT_PRIMES))
-    ap.add_argument("--weight-decays", type=str,
-                    default=",".join(f"{x:g}" for x in DEFAULT_WDS))
-    ap.add_argument("--noise-fractions", type=str,
-                    default=",".join(f"{x:g}" for x in DEFAULT_NOISES))
-    ap.add_argument("--seeds", type=str,
-                    default=",".join(str(s) for s in DEFAULT_SEEDS))
+    ap.add_argument(
+        "--primes", type=str, default=",".join(str(p) for p in DEFAULT_PRIMES)
+    )
+    ap.add_argument(
+        "--weight-decays", type=str, default=",".join(f"{x:g}" for x in DEFAULT_WDS)
+    )
+    ap.add_argument(
+        "--noise-fractions",
+        type=str,
+        default=",".join(f"{x:g}" for x in DEFAULT_NOISES),
+    )
+    ap.add_argument(
+        "--seeds", type=str, default=",".join(str(s) for s in DEFAULT_SEEDS)
+    )
     ap.add_argument("--max-steps", type=int, default=50000)
     ap.add_argument("--output-dir", type=str, default="results/prime_sweep")
     ap.add_argument("--array-id", type=int, default=None)
@@ -89,14 +103,16 @@ def main():
         return
     if args.array_id is not None:
         if not 0 <= args.array_id < len(tasks):
-            raise SystemExit(f"--array-id {args.array_id} out of range [0, {len(tasks)})")
+            raise SystemExit(
+                f"--array-id {args.array_id} out of range [0, {len(tasks)})"
+            )
         p, wd, n, s = tasks[args.array_id]
         print(f"[array {args.array_id}/{len(tasks)}] p={p} wd={wd} noise={n} seed={s}")
         run_one(p, wd, n, s, args.output_dir, args.max_steps)
         return
 
     for i, (p, wd, n, s) in enumerate(tasks):
-        print(f"\n[{i+1}/{len(tasks)}] p={p} wd={wd} noise={n} seed={s}")
+        print(f"\n[{i + 1}/{len(tasks)}] p={p} wd={wd} noise={n} seed={s}")
         run_one(p, wd, n, s, args.output_dir, args.max_steps)
 
 

@@ -26,8 +26,12 @@ from typing import Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-DEFAULT_RESULTS_DIR = Path("/scratch/qzp4ta/grokking-collapse/results/contamination_real")
-DEFAULT_TOY_RESULTS_DIR = Path("/scratch/qzp4ta/grokking-collapse/results/contamination")
+DEFAULT_RESULTS_DIR = Path(
+    "/scratch/qzp4ta/grokking-collapse/results/contamination_real"
+)
+DEFAULT_TOY_RESULTS_DIR = Path(
+    "/scratch/qzp4ta/grokking-collapse/results/contamination"
+)
 
 PLOT_METRICS = [
     "perplexity",
@@ -47,10 +51,15 @@ PLOT_METRICS = [
 # Loading
 # ---------------------------------------------------------------------------
 
+
 def load_runs(results_dir: Path) -> List[dict]:
     runs = []
     for f in sorted(results_dir.glob("*.json")):
-        if f.name in {"summary.json", "downstream_summary.json", "phase_transitions.json"}:
+        if f.name in {
+            "summary.json",
+            "downstream_summary.json",
+            "phase_transitions.json",
+        }:
             continue
         try:
             data = json.loads(f.read_text())
@@ -90,6 +99,7 @@ def final_value(run: dict, metric: str) -> float:
 # ---------------------------------------------------------------------------
 # Plotting
 # ---------------------------------------------------------------------------
+
 
 def _aligned_curve(
     runs: List[dict], metric: str
@@ -137,7 +147,8 @@ def plot_training_curves(
             continue
         ax.set_xlabel("Training step")
         ax.set_ylabel(metric)
-        ax.set_title(f"{metric} during training{suffix and ' (' + suffix + ')'}")
+        ax.set_title(f"{metric} during training{
+                suffix and ' (' + suffix + ')'}")
         ax.legend(title="ratio", fontsize=8)
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
@@ -166,7 +177,8 @@ def plot_final_vs_ratio(
         ax.errorbar(ratios, means, yerr=stds, marker="o", capsize=4, lw=2)
         ax.set_xlabel("Contamination ratio (%)")
         ax.set_ylabel(metric)
-        ax.set_title(f"Final {metric} vs ratio{suffix and ' (' + suffix + ')'}")
+        ax.set_title(f"Final {metric} vs ratio{
+                suffix and ' (' + suffix + ')'}")
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
         name = f"final_{metric}_vs_ratio" + (f"_{suffix}" if suffix else "") + ".png"
@@ -177,6 +189,7 @@ def plot_final_vs_ratio(
 # ---------------------------------------------------------------------------
 # Phase transition detection
 # ---------------------------------------------------------------------------
+
 
 def detect_phase_transition(groups: Dict[int, List[dict]]) -> Dict[str, dict]:
     out: Dict[str, dict] = {}
@@ -205,6 +218,7 @@ def detect_phase_transition(groups: Dict[int, List[dict]]) -> Dict[str, dict]:
 # ---------------------------------------------------------------------------
 # Toy / real overlay (the publication-grade comparison plot)
 # ---------------------------------------------------------------------------
+
 
 def overlay_toy(
     real_groups: Dict[int, List[dict]],
@@ -235,8 +249,16 @@ def overlay_toy(
             continue
         means_n = np.array(means) / max(np.array(means))
         stds_n = np.array(stds) / max(np.array(means))
-        ax.errorbar(ratios, means_n, yerr=stds_n, marker="o", capsize=4,
-                    lw=2, label=label, color=color)
+        ax.errorbar(
+            ratios,
+            means_n,
+            yerr=stds_n,
+            marker="o",
+            capsize=4,
+            lw=2,
+            label=label,
+            color=color,
+        )
     ax.set_xlabel("Contamination ratio (%)")
     ax.set_ylabel(f"normalized {metric}")
     ax.set_title(f"Toy vs real: {metric}")
@@ -251,13 +273,19 @@ def overlay_toy(
 # Driver
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=str, default=str(DEFAULT_RESULTS_DIR))
-    parser.add_argument("--toy-results-dir", type=str,
-                        default=str(DEFAULT_TOY_RESULTS_DIR))
-    parser.add_argument("--mode", type=str, default="ai",
-                        help="Which mode group to analyze (ai|noise|scarcity|self|external)")
+    parser.add_argument(
+        "--toy-results-dir", type=str, default=str(DEFAULT_TOY_RESULTS_DIR)
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="ai",
+        help="Which mode group to analyze (ai|noise|scarcity|self|external)",
+    )
     args = parser.parse_args()
 
     results_dir = Path(args.results_dir)
@@ -267,11 +295,13 @@ def main() -> None:
     if not runs:
         print(f"[analyze_real] no runs found in {results_dir}", flush=True)
         return
-    print(f"[analyze_real] loaded {len(runs)} runs from {results_dir}", flush=True)
+    print(f"[analyze_real] loaded {
+            len(runs)} runs from {results_dir}", flush=True)
 
     main_groups = group_by_ratio(runs, mode=args.mode)
-    print(f"[analyze_real] mode={args.mode} ratios={list(main_groups.keys())}",
-          flush=True)
+    print(
+        f"[analyze_real] mode={args.mode} ratios={list(main_groups.keys())}", flush=True
+    )
     plot_training_curves(main_groups, plots_dir, suffix=args.mode)
     plot_final_vs_ratio(main_groups, plots_dir, suffix=args.mode)
     transitions = detect_phase_transition(main_groups)
@@ -328,8 +358,10 @@ def main() -> None:
 
     summary_path = results_dir / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2))
-    print(f"[analyze_real] wrote plots -> {plots_dir} and summary -> {summary_path}",
-          flush=True)
+    print(
+        f"[analyze_real] wrote plots -> {plots_dir} and summary -> {summary_path}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

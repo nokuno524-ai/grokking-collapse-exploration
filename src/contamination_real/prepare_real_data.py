@@ -61,6 +61,7 @@ DEFAULT_SEEDS = (0, 1, 2)
 # Utility
 # ---------------------------------------------------------------------------
 
+
 def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -88,6 +89,7 @@ def _safe_select(ds: Dataset, indices: List[int]) -> Dataset:
 # ---------------------------------------------------------------------------
 # Clean splits
 # ---------------------------------------------------------------------------
+
 
 def build_clean_splits(
     tokenizer,
@@ -144,6 +146,7 @@ def build_clean_splits(
 # AI generation
 # ---------------------------------------------------------------------------
 
+
 @torch.no_grad()
 def generate_ai_docs(
     train_tok: Dataset,
@@ -175,7 +178,7 @@ def generate_ai_docs(
     out_rows = {"input_ids": [], "attention_mask": []}
 
     for start in range(0, len(indices), batch_size):
-        batch_idx = indices[start:start + batch_size]
+        batch_idx = indices[start : start + batch_size]
         if not batch_idx:
             continue
         prompt_ids = []
@@ -205,10 +208,18 @@ def generate_ai_docs(
         except torch.cuda.OutOfMemoryError:
             torch.cuda.empty_cache()
             half = max(1, len(batch_idx) // 2)
-            print(f"[prepare_real_data] OOM at batch {start}; "
-                  f"retrying with batch={half}", flush=True)
+            print(
+                f"[prepare_real_data] OOM at batch {start}; "
+                f"retrying with batch={half}",
+                flush=True,
+            )
             return _generate_recursively(
-                train_tok, indices, tokenizer, gen_model, device, seed,
+                train_tok,
+                indices,
+                tokenizer,
+                gen_model,
+                device,
+                seed,
                 batch_size=half,
                 prompt_len=prompt_len,
                 max_new_tokens=max_new_tokens,
@@ -236,6 +247,7 @@ def _generate_recursively(*args, **kwargs) -> Dataset:
 # ---------------------------------------------------------------------------
 # Other contamination modes (random-token noise, scarcity, self-contam)
 # ---------------------------------------------------------------------------
+
 
 def make_noise_replacements(
     n: int,
@@ -292,18 +304,24 @@ def make_external_replacements(
         texts = texts[:n]
 
     enc = tokenizer(
-        texts, truncation=True, max_length=MAX_SEQ_LEN,
-        padding="max_length", return_tensors=None,
+        texts,
+        truncation=True,
+        max_length=MAX_SEQ_LEN,
+        padding="max_length",
+        return_tensors=None,
     )
-    return Dataset.from_dict({
-        "input_ids": enc["input_ids"],
-        "attention_mask": enc["attention_mask"],
-    })
+    return Dataset.from_dict(
+        {
+            "input_ids": enc["input_ids"],
+            "attention_mask": enc["attention_mask"],
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Mixture builder
 # ---------------------------------------------------------------------------
+
 
 def make_mixture(
     train_tok: Dataset,
@@ -334,8 +352,9 @@ def make_mixture(
     keep_idx = sorted(perm[n_replace:])
 
     kept = train_tok.select(keep_idx)
-    kept = kept.remove_columns([c for c in kept.column_names
-                                if c not in ("input_ids", "attention_mask")])
+    kept = kept.remove_columns(
+        [c for c in kept.column_names if c not in ("input_ids", "attention_mask")]
+    )
 
     if mode == "scarcity":
         return kept.shuffle(seed=seed)
@@ -344,7 +363,9 @@ def make_mixture(
         repl = make_noise_replacements(n_replace, tokenizer, seed)
     elif mode == "external":
         if not ai_dataset or not ai_text_field:
-            raise ValueError("--ai-dataset and --ai-text-field required for mode=external")
+            raise ValueError(
+                "--ai-dataset and --ai-text-field required for mode=external"
+            )
         repl = make_external_replacements(
             n_replace, ai_dataset, ai_text_field, tokenizer, seed
         )
@@ -355,10 +376,13 @@ def make_mixture(
             train_tok, replace_idx, tokenizer, gen_model, device, seed
         )
 
-    mixture = Dataset.from_dict({
-        "input_ids": list(kept["input_ids"]) + list(repl["input_ids"]),
-        "attention_mask": list(kept["attention_mask"]) + list(repl["attention_mask"]),
-    })
+    mixture = Dataset.from_dict(
+        {
+            "input_ids": list(kept["input_ids"]) + list(repl["input_ids"]),
+            "attention_mask": list(kept["attention_mask"])
+            + list(repl["attention_mask"]),
+        }
+    )
     return mixture.shuffle(seed=seed)
 
 
@@ -366,33 +390,61 @@ def make_mixture(
 # Driver
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     # Declared up-front so the parser defaults (which reference these globals)
     # are valid before the override block reassigns them.
     global MAX_SEQ_LEN, PROMPT_LEN, GEN_LEN, GEN_BATCH_SIZE
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ratios", type=float, nargs="+",
-                        default=list(DEFAULT_RATIOS),
-                        help="Contamination ratios in percent (0-100)")
+    parser.add_argument(
+        "--ratios",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_RATIOS),
+        help="Contamination ratios in percent (0-100)",
+    )
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))
     parser.add_argument("--data-root", type=str, default=str(DEFAULT_DATA_ROOT))
     parser.add_argument("--n-docs", type=int, default=N_DOCS)
-    parser.add_argument("--gen-model", type=str, default="gpt2-xl",
-                        help="HF model used to generate AI text")
+    parser.add_argument(
+        "--gen-model",
+        type=str,
+        default="gpt2-xl",
+        help="HF model used to generate AI text",
+    )
     parser.add_argument("--tokenizer", type=str, default="gpt2-medium")
-    parser.add_argument("--mode", type=str, default="ai",
-                        choices=["ai", "noise", "scarcity", "external", "self"])
-    parser.add_argument("--ai-dataset", type=str, default=None,
-                        help="HF dataset for mode=external (e.g. Hello-SimpleAI/HC3)")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="ai",
+        choices=["ai", "noise", "scarcity", "external", "self"],
+    )
+    parser.add_argument(
+        "--ai-dataset",
+        type=str,
+        default=None,
+        help="HF dataset for mode=external (e.g. Hello-SimpleAI/HC3)",
+    )
     parser.add_argument("--ai-text-field", type=str, default=None)
-    parser.add_argument("--no-stream", action="store_true",
-                        help="Do not stream OpenWebText (load full split)")
+    parser.add_argument(
+        "--no-stream",
+        action="store_true",
+        help="Do not stream OpenWebText (load full split)",
+    )
     parser.add_argument("--gen-batch-size", type=int, default=GEN_BATCH_SIZE)
     parser.add_argument("--max-new-tokens", type=int, default=GEN_LEN)
-    parser.add_argument("--max-seq-len", type=int, default=MAX_SEQ_LEN,
-                        help="Max sequence length for tokenization & generation outputs")
-    parser.add_argument("--prompt-len", type=int, default=PROMPT_LEN,
-                        help="Prompt length used to seed AI continuations")
+    parser.add_argument(
+        "--max-seq-len",
+        type=int,
+        default=MAX_SEQ_LEN,
+        help="Max sequence length for tokenization & generation outputs",
+    )
+    parser.add_argument(
+        "--prompt-len",
+        type=int,
+        default=PROMPT_LEN,
+        help="Prompt length used to seed AI continuations",
+    )
     args = parser.parse_args()
 
     os.environ.setdefault("PYTHONUNBUFFERED", "1")
@@ -416,22 +468,32 @@ def main() -> None:
     clean_train_path = data_root / "clean_train"
     clean_test_path = data_root / "test"
     if clean_train_path.exists() and clean_test_path.exists():
-        print(f"[prepare_real_data] reusing cached clean splits at {data_root}", flush=True)
+        print(
+            f"[prepare_real_data] reusing cached clean splits at {data_root}",
+            flush=True,
+        )
         train_tok = Dataset.load_from_disk(str(clean_train_path))
         test_tok = Dataset.load_from_disk(str(clean_test_path))
     else:
         train_tok, test_tok = build_clean_splits(
-            tokenizer, n_docs=args.n_docs, train_frac=TRAIN_FRAC,
-            shuffle_seed=1234, streaming=not args.no_stream,
+            tokenizer,
+            n_docs=args.n_docs,
+            train_frac=TRAIN_FRAC,
+            shuffle_seed=1234,
+            streaming=not args.no_stream,
         )
         train_tok.save_to_disk(str(clean_train_path))
         test_tok.save_to_disk(str(clean_test_path))
-        print(f"[prepare_real_data] saved clean train ({len(train_tok)}) "
-              f"test ({len(test_tok)}) -> {data_root}", flush=True)
+        print(
+            f"[prepare_real_data] saved clean train ({len(train_tok)}) "
+            f"test ({len(test_tok)}) -> {data_root}",
+            flush=True,
+        )
 
     gen_model = None
     if args.mode in ("ai", "self"):
-        print(f"[prepare_real_data] loading generator: {args.gen_model}", flush=True)
+        print(f"[prepare_real_data] loading generator: {
+                args.gen_model}", flush=True)
         # fp16 only on CUDA; fp16 on CPU silently upcasts and is slow.
         gen_dtype = torch.float16 if device.type == "cuda" else torch.float32
         gen_model = AutoModelForCausalLM.from_pretrained(
@@ -462,17 +524,25 @@ def main() -> None:
             if out_dir.exists() and any(out_dir.iterdir()):
                 print(f"[prepare_real_data] skip existing {out_dir}", flush=True)
                 continue
-            print(f"[prepare_real_data] building ratio={ratio_pct}% seed={seed} "
-                  f"mode={args.mode}", flush=True)
+            print(
+                f"[prepare_real_data] building ratio={ratio_pct}% seed={seed} " f"mode={
+                    args.mode}", flush=True
+            )
             mixture = make_mixture(
-                train_tok, ratio, seed, tokenizer, gen_model, device,
+                train_tok,
+                ratio,
+                seed,
+                tokenizer,
+                gen_model,
+                device,
                 mode=args.mode,
-                ai_dataset=args.ai_dataset, ai_text_field=args.ai_text_field,
+                ai_dataset=args.ai_dataset,
+                ai_text_field=args.ai_text_field,
             )
             out_dir.mkdir(parents=True, exist_ok=True)
             mixture.save_to_disk(str(out_dir))
-            print(f"[prepare_real_data] wrote {len(mixture)} rows -> {out_dir}",
-                  flush=True)
+            print(f"[prepare_real_data] wrote {
+                    len(mixture)} rows -> {out_dir}", flush=True)
 
     print("[prepare_real_data] done.", flush=True)
 

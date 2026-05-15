@@ -40,6 +40,7 @@ GEN_BATCH_SIZE = 8
 # Clean corpus
 # ---------------------------------------------------------------------------
 
+
 def _tokenize_fn(examples, tokenizer):
     enc = tokenizer(
         examples["text"],
@@ -84,6 +85,7 @@ def build_clean_splits(
 # Contamination via GPT-2-medium
 # ---------------------------------------------------------------------------
 
+
 @torch.no_grad()
 def generate_contaminated_docs(
     train_tok: Dataset,
@@ -108,7 +110,7 @@ def generate_contaminated_docs(
     replacements = {"input_ids": [], "attention_mask": []}
 
     for start in range(0, n_to_replace, GEN_BATCH_SIZE):
-        batch_idx = indices[start:start + GEN_BATCH_SIZE]
+        batch_idx = indices[start : start + GEN_BATCH_SIZE]
         prompt_ids = []
         for i in batch_idx:
             ids = train_tok[i]["input_ids"][:PROMPT_LEN]
@@ -166,12 +168,16 @@ def make_mixture(
         train_tok, n_replace, replace_idx, tokenizer, gen_model, device, seed
     )
     kept = train_tok.select(keep_idx)
-    kept = kept.remove_columns([c for c in kept.column_names
-                                if c not in ("input_ids", "attention_mask")])
-    mixture = Dataset.from_dict({
-        "input_ids": list(kept["input_ids"]) + list(replacements["input_ids"]),
-        "attention_mask": list(kept["attention_mask"]) + list(replacements["attention_mask"]),
-    })
+    kept = kept.remove_columns(
+        [c for c in kept.column_names if c not in ("input_ids", "attention_mask")]
+    )
+    mixture = Dataset.from_dict(
+        {
+            "input_ids": list(kept["input_ids"]) + list(replacements["input_ids"]),
+            "attention_mask": list(kept["attention_mask"])
+            + list(replacements["attention_mask"]),
+        }
+    )
     # Shuffle the mixture so contaminated rows aren't all at the end.
     mixture = mixture.shuffle(seed=seed)
     return mixture
@@ -181,11 +187,16 @@ def make_mixture(
 # Driver
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ratios", type=float, nargs="+",
-                        default=[0, 10, 30, 50, 80, 100],
-                        help="Contamination ratios in percent (0-100)")
+    parser.add_argument(
+        "--ratios",
+        type=float,
+        nargs="+",
+        default=[0, 10, 30, 50, 80, 100],
+        help="Contamination ratios in percent (0-100)",
+    )
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     parser.add_argument("--data-root", type=str, default=str(DEFAULT_DATA_ROOT))
     parser.add_argument("--n-docs", type=int, default=N_DOCS)
@@ -214,8 +225,10 @@ def main():
         )
         train_tok.save_to_disk(str(clean_train_path))
         test_tok.save_to_disk(str(clean_test_path))
-        print(f"[prepare_data] saved clean train ({len(train_tok)}) and "
-              f"test ({len(test_tok)}) to {data_root}")
+        print(
+            f"[prepare_data] saved clean train ({len(train_tok)}) and "
+            f"test ({len(test_tok)}) to {data_root}"
+        )
 
     # Load generator model
     gen_model = GPT2LMHeadModel.from_pretrained(args.gen_model).to(device)

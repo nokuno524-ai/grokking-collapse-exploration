@@ -14,7 +14,6 @@ Layout:
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import List, Tuple
 
@@ -41,8 +40,9 @@ def build_tasks(wds, noises, seeds) -> List[Tuple[float, float, int]]:
     return [(w, n, s) for w in wds for n in noises for s in seeds]
 
 
-def run_one(wd: float, noise_fraction: float, seed: int,
-            output_root: str, max_steps: int):
+def run_one(
+    wd: float, noise_fraction: float, seed: int, output_root: str, max_steps: int
+):
     out_dir = Path(output_root) / fmt_wd(wd) / fmt_noise(noise_fraction)
     train_config = TrainConfig(
         prime=59,
@@ -62,19 +62,30 @@ def run_one(wd: float, noise_fraction: float, seed: int,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--weight-decays", type=str,
-                        default=",".join(f"{x:g}" for x in DEFAULT_WDS))
-    parser.add_argument("--noise-fractions", type=str,
-                        default=",".join(f"{x:g}" for x in DEFAULT_NOISES))
-    parser.add_argument("--seeds", type=str,
-                        default=",".join(str(s) for s in DEFAULT_SEEDS))
+    parser.add_argument(
+        "--weight-decays", type=str, default=",".join(f"{x:g}" for x in DEFAULT_WDS)
+    )
+    parser.add_argument(
+        "--noise-fractions",
+        type=str,
+        default=",".join(f"{x:g}" for x in DEFAULT_NOISES),
+    )
+    parser.add_argument(
+        "--seeds", type=str, default=",".join(str(s) for s in DEFAULT_SEEDS)
+    )
     parser.add_argument("--max-steps", type=int, default=50000)
-    parser.add_argument("--output-dir", type=str,
-                        default="results/exp_c_grid")
-    parser.add_argument("--array-id", type=int, default=None,
-                        help="If set, run only the task at this index.")
-    parser.add_argument("--print-task-count", action="store_true",
-                        help="Just print the total number of tasks and exit.")
+    parser.add_argument("--output-dir", type=str, default="results/exp_c_grid")
+    parser.add_argument(
+        "--array-id",
+        type=int,
+        default=None,
+        help="If set, run only the task at this index.",
+    )
+    parser.add_argument(
+        "--print-task-count",
+        action="store_true",
+        help="Just print the total number of tasks and exit.",
+    )
     args = parser.parse_args()
 
     wds = [float(x) for x in args.weight_decays.split(",") if x]
@@ -97,7 +108,9 @@ def main():
         return
 
     for i, (wd, noise, seed) in enumerate(tasks):
-        print(f"\n{'='*60}\n[{i+1}/{len(tasks)}] wd={wd} noise={noise} seed={seed}\n{'='*60}")
+        print(
+            f"\n{'=' * 60}\n[{i + 1}/{len(tasks)}] wd={wd} noise={noise} seed={seed}\n{'=' * 60}"
+        )
         run_one(wd, noise, seed, args.output_dir, args.max_steps)
 
 

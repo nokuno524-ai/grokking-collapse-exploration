@@ -57,35 +57,33 @@ itself — we patch whole matrices, which is cleanest for a first pass.
 from __future__ import annotations
 
 import argparse
-import copy
 import json
-import math
 import re
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
+matplotlib.use("Agg")
+
 try:
-    from .model import ModularArithmeticTransformer
     from .data import DatasetConfig, generate_modular_arithmetic
+    from .model import ModularArithmeticTransformer
     from .train import compute_fourier_concentration, evaluate
 except ImportError:
-    from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
+    from model import ModularArithmeticTransformer  # type: ignore
     from train import compute_fourier_concentration, evaluate  # type: ignore
 
 
-# Mapping from a short component name to the regex of state_dict keys it covers.
+# Mapping from a short component name to the regex of state_dict keys it
+# covers.
 COMPONENT_PATTERNS: Dict[str, str] = {
     "token_embed": r"^token_embed\.",
     "pos_embed": r"^pos_embed\.",
@@ -134,8 +132,10 @@ def keys_for(component: str, sd: Dict[str, torch.Tensor]) -> List[str]:
 def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
     """Return (state_dict, config) for the given run.
     If step is None, picks the largest checkpoint."""
-    ckpts = sorted(run_dir.glob("checkpoint_*.pt"),
-                   key=lambda p: int(re.findall(r"\d+", p.name)[-1]))
+    ckpts = sorted(
+        run_dir.glob("checkpoint_*.pt"),
+        key=lambda p: int(re.findall(r"\d+", p.name)[-1]),
+    )
     if not ckpts:
         raise FileNotFoundError(f"no checkpoint_*.pt in {run_dir}")
     chosen: Optional[Path] = None
@@ -186,7 +186,8 @@ def get_fourier_basis(token_embed: torch.Tensor, top_k: int = 5) -> dict:
     total = avg.sum().clamp(min=1e-12)
     topv, topi = torch.topk(avg, k=min(top_k, avg.numel()))
     return {
-        "top_frequencies": [int(i.item()) + 1 for i in topi],  # +1 because we dropped DC
+        # +1 because we dropped DC
+        "top_frequencies": [int(i.item()) + 1 for i in topi],
         "top_fraction": float(topv.sum().item() / total.item()),
         "spectrum_top10": [float(x.item()) for x in avg[:10]],
     }
@@ -263,7 +264,9 @@ def make_loaders(
     test_ds = TensorDataset(test_in, test_tgt)
     g = torch.Generator()
     g.manual_seed(int(cfg.get("seed", 42)))
-    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, generator=g)
+    train_loader = DataLoader(
+        train_ds, batch_size=batch_size, shuffle=True, generator=g
+    )
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
 
@@ -348,8 +351,9 @@ def run_one_variant(
         # baseline / swap_all path: state dict is taken as-is from `donor_sd`
         sd = {k: v.clone() for k, v in (donor_sd or base_sd).items()}
     else:
-        sd = patch_state_dict(base_sd, donor_sd or {}, component,
-                              randomize=randomize, rng=rng)
+        sd = patch_state_dict(
+            base_sd, donor_sd or {}, component, randomize=randomize, rng=rng
+        )
     model = build_model(cfg_for_model, device)
     missing, unexpected = model.load_state_dict(sd, strict=False)
     if unexpected:
@@ -360,8 +364,13 @@ def run_one_variant(
         # Freeze the patched component so the rest adapts around it.
         freeze_component(model, component)
         metrics = rescue_train(
-            model, train_loader, test_loader, device,
-            steps=rescue_steps, lr=rescue_lr, weight_decay=rescue_wd,
+            model,
+            train_loader,
+            test_loader,
+            device,
+            steps=rescue_steps,
+            lr=rescue_lr,
+            weight_decay=rescue_wd,
         )
         notes = f"froze {component}, retrained other params for {rescue_steps} steps"
     else:
@@ -456,7 +465,9 @@ def plot_bar(results: List[VariantResult], out_path: Path) -> None:
             colors.append("#ff7f0e")
     fig, ax = plt.subplots(figsize=(max(8, len(results) * 0.45), 5))
     ax.bar(range(len(names)), accs, color=colors)
-    ax.axhline(0.95, color="black", linestyle="--", alpha=0.4, label="grokking threshold")
+    ax.axhline(
+        0.95, color="black", linestyle="--", alpha=0.4, label="grokking threshold"
+    )
     ax.set_xticks(range(len(names)))
     ax.set_xticklabels(names, rotation=45, ha="right", fontsize=8)
     ax.set_ylabel("test accuracy")
@@ -471,27 +482,58 @@ def plot_bar(results: List[VariantResult], out_path: Path) -> None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pure-run", type=Path, required=True,
-                    help="Path to a grokked run directory (contains checkpoint_*.pt + results.json).")
-    ap.add_argument("--contam-run", type=Path, required=True,
-                    help="Path to a failed-grokking run at the *same seed*.")
-    ap.add_argument("--pure-step", type=int, default=None,
-                    help="Which checkpoint step to use for pure (default: last).")
-    ap.add_argument("--contam-step", type=int, default=None,
-                    help="Which checkpoint step to use for contam (default: last).")
-    ap.add_argument("--components", type=str,
-                    default=",".join(DEFAULT_PATCH_COMPONENTS),
-                    help="Comma-separated components to patch.")
-    ap.add_argument("--rescue-steps", type=int, default=2000,
-                    help="Steps of post-patch retraining (0 to disable retrain row).")
+    ap.add_argument(
+        "--pure-run",
+        type=Path,
+        required=True,
+        help="Path to a grokked run directory (contains checkpoint_*.pt + results.json).",
+    )
+    ap.add_argument(
+        "--contam-run",
+        type=Path,
+        required=True,
+        help="Path to a failed-grokking run at the *same seed*.",
+    )
+    ap.add_argument(
+        "--pure-step",
+        type=int,
+        default=None,
+        help="Which checkpoint step to use for pure (default: last).",
+    )
+    ap.add_argument(
+        "--contam-step",
+        type=int,
+        default=None,
+        help="Which checkpoint step to use for contam (default: last).",
+    )
+    ap.add_argument(
+        "--components",
+        type=str,
+        default=",".join(DEFAULT_PATCH_COMPONENTS),
+        help="Comma-separated components to patch.",
+    )
+    ap.add_argument(
+        "--rescue-steps",
+        type=int,
+        default=2000,
+        help="Steps of post-patch retraining (0 to disable retrain row).",
+    )
     ap.add_argument("--rescue-lr", type=float, default=1e-3)
-    ap.add_argument("--rescue-wd", type=float, default=None,
-                    help="Weight decay during rescue (default: contam-run's wd).")
-    ap.add_argument("--output-dir", type=Path,
-                    default=Path("analysis/transplant"),
-                    help="Where to save results.")
-    ap.add_argument("--seed", type=int, default=0,
-                    help="Seed for random-basis controls and rescue.")
+    ap.add_argument(
+        "--rescue-wd",
+        type=float,
+        default=None,
+        help="Weight decay during rescue (default: contam-run's wd).",
+    )
+    ap.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("analysis/transplant"),
+        help="Where to save results.",
+    )
+    ap.add_argument(
+        "--seed", type=int, default=0, help="Seed for random-basis controls and rescue."
+    )
     args = ap.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -500,13 +542,19 @@ def main():
 
     pure_sd, pure_cfg = load_run(args.pure_run, args.pure_step)
     contam_sd, contam_cfg = load_run(args.contam_run, args.contam_step)
-    print(f"[info] pure cfg: wd={pure_cfg.get('weight_decay')} "
-          f"noise={pure_cfg.get('noise_fraction')} seed={pure_cfg.get('seed')}")
-    print(f"[info] contam cfg: wd={contam_cfg.get('weight_decay')} "
-          f"noise={contam_cfg.get('noise_fraction')} seed={contam_cfg.get('seed')}")
+    print(f"[info] pure cfg: wd={
+        pure_cfg.get('weight_decay')} " f"noise={
+        pure_cfg.get('noise_fraction')} seed={
+        pure_cfg.get('seed')}")
+    print(f"[info] contam cfg: wd={
+        contam_cfg.get('weight_decay')} " f"noise={
+        contam_cfg.get('noise_fraction')} seed={
+        contam_cfg.get('seed')}")
 
     if int(pure_cfg.get("seed", -1)) != int(contam_cfg.get("seed", -2)):
-        print("[warn] seeds differ — train/test split will not match. Continuing anyway.")
+        print(
+            "[warn] seeds differ — train/test split will not match. Continuing anyway."
+        )
     for fld in ("prime", "d_model", "n_heads", "d_ff", "n_layers"):
         if pure_cfg.get(fld) != contam_cfg.get(fld):
             raise ValueError(
@@ -522,106 +570,175 @@ def main():
     components = [c.strip() for c in args.components.split(",") if c.strip()]
     for c in components:
         if c not in COMPONENT_PATTERNS:
-            raise ValueError(f"unknown component {c!r}; valid: {list(COMPONENT_PATTERNS)}")
+            raise ValueError(f"unknown component {
+                c!r}; valid: {
+                list(COMPONENT_PATTERNS)}")
 
     # Fourier-basis metadata
     pure_basis = get_fourier_basis(pure_sd["token_embed.weight"])
     contam_basis = get_fourier_basis(contam_sd["token_embed.weight"])
-    print(f"[info] pure top freqs = {pure_basis['top_frequencies']} "
-          f"({pure_basis['top_fraction']:.3f})")
-    print(f"[info] contam top freqs = {contam_basis['top_frequencies']} "
-          f"({contam_basis['top_fraction']:.3f})")
+    print(
+        f"[info] pure top freqs = {pure_basis['top_frequencies']} "
+        f"({pure_basis['top_fraction']:.3f})"
+    )
+    print(
+        f"[info] contam top freqs = {contam_basis['top_frequencies']} "
+        f"({contam_basis['top_fraction']:.3f})"
+    )
 
     results: List[VariantResult] = []
 
     # Baselines (no patch)
     print("[run] baseline_pure …")
-    results.append(run_one_variant(
-        "baseline_pure", base_sd=pure_sd, donor_sd=None, component=None,
-        cfg_for_loaders=pure_cfg, cfg_for_model=pure_cfg, device=device,
-    ))
+    results.append(
+        run_one_variant(
+            "baseline_pure",
+            base_sd=pure_sd,
+            donor_sd=None,
+            component=None,
+            cfg_for_loaders=pure_cfg,
+            cfg_for_model=pure_cfg,
+            device=device,
+        )
+    )
     print("[run] baseline_contam …")
-    results.append(run_one_variant(
-        "baseline_contam", base_sd=contam_sd, donor_sd=None, component=None,
-        cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg, device=device,
-    ))
-    # Sanity: load pure into contam-cfg loader (should equal baseline_pure for matched seeds)
+    results.append(
+        run_one_variant(
+            "baseline_contam",
+            base_sd=contam_sd,
+            donor_sd=None,
+            component=None,
+            cfg_for_loaders=contam_cfg,
+            cfg_for_model=contam_cfg,
+            device=device,
+        )
+    )
+    # Sanity: load pure into contam-cfg loader (should equal baseline_pure for
+    # matched seeds)
     print("[run] swap_all …")
-    results.append(run_one_variant(
-        "swap_all", base_sd=contam_sd, donor_sd=pure_sd, component=None,
-        cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg, device=device,
-    ))
+    results.append(
+        run_one_variant(
+            "swap_all",
+            base_sd=contam_sd,
+            donor_sd=pure_sd,
+            component=None,
+            cfg_for_loaders=contam_cfg,
+            cfg_for_model=contam_cfg,
+            device=device,
+        )
+    )
 
     # Per-component variants
     for comp in components:
         print(f"[run] transplant_{comp} (zero-shot) …")
-        results.append(run_one_variant(
-            f"transplant_{comp}", base_sd=contam_sd, donor_sd=pure_sd,
-            component=comp,
-            cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
-            device=device, rescue_steps=0,
-        ))
+        results.append(
+            run_one_variant(
+                f"transplant_{comp}",
+                base_sd=contam_sd,
+                donor_sd=pure_sd,
+                component=comp,
+                cfg_for_loaders=contam_cfg,
+                cfg_for_model=contam_cfg,
+                device=device,
+                rescue_steps=0,
+            )
+        )
         if args.rescue_steps > 0:
             print(f"[run] transplant_{comp}+rt …")
-            results.append(run_one_variant(
-                f"transplant_{comp}+rt", base_sd=contam_sd, donor_sd=pure_sd,
-                component=comp,
-                cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
-                device=device, rescue_steps=args.rescue_steps,
-                rescue_lr=args.rescue_lr, rescue_wd=rescue_wd,
-                rescue_seed=args.seed,
-            ))
+            results.append(
+                run_one_variant(
+                    f"transplant_{comp}+rt",
+                    base_sd=contam_sd,
+                    donor_sd=pure_sd,
+                    component=comp,
+                    cfg_for_loaders=contam_cfg,
+                    cfg_for_model=contam_cfg,
+                    device=device,
+                    rescue_steps=args.rescue_steps,
+                    rescue_lr=args.rescue_lr,
+                    rescue_wd=rescue_wd,
+                    rescue_seed=args.seed,
+                )
+            )
         print(f"[run] rand_{comp} (zero-shot) …")
-        results.append(run_one_variant(
-            f"rand_{comp}", base_sd=contam_sd, donor_sd=None,
-            component=comp,
-            cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
-            device=device, randomize=True, rng=rng, rescue_steps=0,
-        ))
+        results.append(
+            run_one_variant(
+                f"rand_{comp}",
+                base_sd=contam_sd,
+                donor_sd=None,
+                component=comp,
+                cfg_for_loaders=contam_cfg,
+                cfg_for_model=contam_cfg,
+                device=device,
+                randomize=True,
+                rng=rng,
+                rescue_steps=0,
+            )
+        )
         if args.rescue_steps > 0:
             print(f"[run] rand_{comp}+rt …")
-            results.append(run_one_variant(
-                f"rand_{comp}+rt", base_sd=contam_sd, donor_sd=None,
-                component=comp,
-                cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
-                device=device, randomize=True, rng=rng,
-                rescue_steps=args.rescue_steps,
-                rescue_lr=args.rescue_lr, rescue_wd=rescue_wd,
-                rescue_seed=args.seed,
-            ))
+            results.append(
+                run_one_variant(
+                    f"rand_{comp}+rt",
+                    base_sd=contam_sd,
+                    donor_sd=None,
+                    component=comp,
+                    cfg_for_loaders=contam_cfg,
+                    cfg_for_model=contam_cfg,
+                    device=device,
+                    randomize=True,
+                    rng=rng,
+                    rescue_steps=args.rescue_steps,
+                    rescue_lr=args.rescue_lr,
+                    rescue_wd=rescue_wd,
+                    rescue_seed=args.seed,
+                )
+            )
 
     # Persist
     json_path = args.output_dir / "rescue_results.json"
     with json_path.open("w") as f:
-        json.dump({
-            "pure_run": str(args.pure_run),
-            "contam_run": str(args.contam_run),
-            "pure_cfg": pure_cfg,
-            "contam_cfg": contam_cfg,
-            "rescue_steps": args.rescue_steps,
-            "rescue_lr": args.rescue_lr,
-            "rescue_wd": rescue_wd,
-            "seed": args.seed,
-            "pure_basis": pure_basis,
-            "contam_basis": contam_basis,
-            "variants": [asdict(r) for r in results],
-        }, f, indent=2)
+        json.dump(
+            {
+                "pure_run": str(args.pure_run),
+                "contam_run": str(args.contam_run),
+                "pure_cfg": pure_cfg,
+                "contam_cfg": contam_cfg,
+                "rescue_steps": args.rescue_steps,
+                "rescue_lr": args.rescue_lr,
+                "rescue_wd": rescue_wd,
+                "seed": args.seed,
+                "pure_basis": pure_basis,
+                "contam_basis": contam_basis,
+                "variants": [asdict(r) for r in results],
+            },
+            f,
+            indent=2,
+        )
     print(f"[done] wrote {json_path}")
 
     write_summary_md(
-        results, pure_basis, contam_basis, pure_cfg, contam_cfg,
+        results,
+        pure_basis,
+        contam_basis,
+        pure_cfg,
+        contam_cfg,
         args.output_dir / "rescue_summary.md",
     )
-    print(f"[done] wrote {args.output_dir/'rescue_summary.md'}")
+    print(f"[done] wrote {args.output_dir / 'rescue_summary.md'}")
 
     plot_bar(results, args.output_dir / "rescue_bar.png")
-    print(f"[done] wrote {args.output_dir/'rescue_bar.png'}")
+    print(f"[done] wrote {args.output_dir / 'rescue_bar.png'}")
 
     # Console summary
     print("\n=== SUMMARY ===")
     for r in results:
         rt = f"+rt({r.rescue_steps})" if r.rescue_steps else ""
-        print(f"  {r.name:30s} {rt:10s} test_acc={r.test_acc:.3f} fc={r.fourier_concentration:.3f}")
+        print(f"  {
+            r.name:30s} {
+            rt:10s} test_acc={
+            r.test_acc:.3f} fc={
+            r.fourier_concentration:.3f}")
 
 
 if __name__ == "__main__":

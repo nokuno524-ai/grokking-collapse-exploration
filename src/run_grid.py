@@ -56,12 +56,15 @@ def run_one(level: float, severity: float, seed: int, output_root: str, max_step
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--levels", type=str,
-                        default=",".join(f"{x:g}" for x in DEFAULT_LEVELS))
-    parser.add_argument("--severities", type=str,
-                        default=",".join(f"{x:g}" for x in DEFAULT_SEVERITIES))
-    parser.add_argument("--seeds", type=str,
-                        default=",".join(str(s) for s in DEFAULT_SEEDS))
+    parser.add_argument(
+        "--levels", type=str, default=",".join(f"{x:g}" for x in DEFAULT_LEVELS)
+    )
+    parser.add_argument(
+        "--severities", type=str, default=",".join(f"{x:g}" for x in DEFAULT_SEVERITIES)
+    )
+    parser.add_argument(
+        "--seeds", type=str, default=",".join(str(s) for s in DEFAULT_SEEDS)
+    )
     parser.add_argument("--max-steps", type=int, default=50000)
     parser.add_argument("--output-dir", type=str, default="results/grid")
     parser.add_argument("--array-id", type=int, default=None)
@@ -71,18 +74,26 @@ def main():
     severities = [float(x) for x in args.severities.split(",") if x.strip()]
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
     tasks = build_tasks(levels, severities, seeds)
-    print(f"Total tasks: {len(tasks)} ({len(levels)} levels × {len(severities)} severities × {len(seeds)} seeds)")
+    print(f"Total tasks: {
+        len(tasks)} ({
+        len(levels)} levels × {
+        len(severities)} severities × {
+        len(seeds)} seeds)")
 
     if args.array_id is not None:
         if not (0 <= args.array_id < len(tasks)):
-            raise SystemExit(f"--array-id {args.array_id} out of range [0, {len(tasks)})")
+            raise SystemExit(
+                f"--array-id {args.array_id} out of range [0, {len(tasks)})"
+            )
         level, severity, seed = tasks[args.array_id]
         print(f"[array {args.array_id}] level={level} severity={severity} seed={seed}")
         run_one(level, severity, seed, args.output_dir, args.max_steps)
         return
 
     for i, (level, severity, seed) in enumerate(tasks):
-        print(f"\n{'='*60}\n[{i+1}/{len(tasks)}] level={level} severity={severity} seed={seed}\n{'='*60}")
+        print(
+            f"\n{'=' * 60}\n[{i + 1}/{len(tasks)}] level={level} severity={severity} seed={seed}\n{'=' * 60}"
+        )
         run_one(level, severity, seed, args.output_dir, args.max_steps)
 
 

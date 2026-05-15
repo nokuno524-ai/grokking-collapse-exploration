@@ -84,13 +84,13 @@ import json
 import math
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+
+matplotlib.use("Agg")
 
 
 GROK_THRESHOLD = 0.95
@@ -119,15 +119,19 @@ def parse_grid(grid_dir: Path) -> List[dict]:
                     continue
                 with res_path.open() as f:
                     data = json.load(f)
-                rows.append({
-                    "wd": wd,
-                    "noise": noise,
-                    "seed": seed,
-                    "grokked": bool(data.get("grokked", False)),
-                    "final_test_acc": float(data.get("final_test_acc", 0.0)),
-                    "final_train_acc": float(data.get("final_train_acc", 0.0)),
-                    "final_fourier": float(data.get("final_fourier_concentration", 0.0)),
-                })
+                rows.append(
+                    {
+                        "wd": wd,
+                        "noise": noise,
+                        "seed": seed,
+                        "grokked": bool(data.get("grokked", False)),
+                        "final_test_acc": float(data.get("final_test_acc", 0.0)),
+                        "final_train_acc": float(data.get("final_train_acc", 0.0)),
+                        "final_fourier": float(
+                            data.get("final_fourier_concentration", 0.0)
+                        ),
+                    }
+                )
     return rows
 
 
@@ -138,7 +142,8 @@ def per_seed_threshold(rows: List[dict]) -> Dict[Tuple[float, int], float]:
     by_key: Dict[Tuple[float, int], List[Tuple[float, bool]]] = {}
     for r in rows:
         by_key.setdefault((r["wd"], r["seed"]), []).append(
-            (r["noise"], r["final_test_acc"] >= GROK_THRESHOLD))
+            (r["noise"], r["final_test_acc"] >= GROK_THRESHOLD)
+        )
     out: Dict[Tuple[float, int], float] = {}
     for k, lst in by_key.items():
         lst.sort(key=lambda t: t[0])
@@ -148,7 +153,8 @@ def per_seed_threshold(rows: List[dict]) -> Dict[Tuple[float, int], float]:
         if not any(groks):
             out[k] = 0.0
             continue
-        # Find smallest noise where grok=False, that is ≥ smallest noise where grok=True.
+        # Find smallest noise where grok=False, that is ≥ smallest noise where
+        # grok=True.
         first_fail = None
         for n, g in lst:
             if not g:
@@ -178,9 +184,12 @@ def fit_power_law(wds: np.ndarray, etas: np.ndarray) -> Tuple[float, float, floa
     return float(np.exp(log_c)), float(b), float(r2)
 
 
-def bootstrap_ci(per_seed: Dict[Tuple[float, int], float],
-                 n_boot: int = 1000, alpha: float = 0.05,
-                 rng_seed: int = 0) -> Tuple[float, float]:
+def bootstrap_ci(
+    per_seed: Dict[Tuple[float, int], float],
+    n_boot: int = 1000,
+    alpha: float = 0.05,
+    rng_seed: int = 0,
+) -> Tuple[float, float]:
     """Bootstrap CI on the exponent b across seeds."""
     rng = np.random.RandomState(rng_seed)
     seeds = sorted({s for _, s in per_seed.keys()})
@@ -249,8 +258,10 @@ def write_summary(out_path: Path, rows, per_seed, fit, ci, regime_ii_wds):
         f"- Theory predicts b = 1.0; empirical b = {b:+.3f}.\n\n"
     )
     if math.isfinite(b) and lo <= 1.0 <= hi:
-        lines.append("**Verdict:** the predicted exponent b=1 lies inside the 95% CI. "
-                     "Theory is consistent with the empirical scaling at this resolution.\n\n")
+        lines.append(
+            "**Verdict:** the predicted exponent b=1 lies inside the 95% CI. "
+            "Theory is consistent with the empirical scaling at this resolution.\n\n"
+        )
     elif math.isfinite(b):
         lines.append(
             f"**Verdict:** predicted b=1 is *outside* the 95% CI [{lo:.3f}, {hi:.3f}]. "
@@ -265,9 +276,11 @@ def write_summary(out_path: Path, rows, per_seed, fit, ci, regime_ii_wds):
             "or report a *bound* (η* > 0.10 at wd ∈ {0.3, 1.0}) rather than a fit.\n\n"
         )
     lines.append("## How to reproduce\n\n")
-    lines.append("```bash\n"
-                 "python src/threshold_theory.py --grid-dir results/exp_c_grid --output-dir analysis/\n"
-                 "```\n")
+    lines.append(
+        "```bash\n"
+        "python src/threshold_theory.py --grid-dir results/exp_c_grid --output-dir analysis/\n"
+        "```\n"
+    )
     out_path.write_text("".join(lines))
 
 
@@ -286,16 +299,26 @@ def plot_fit(per_seed, fit, regime_ii_wds, out_path):
     ax.plot(wds_unique, medians, marker="o", color="#d62728", label="median η* per wd")
     if math.isfinite(C) and math.isfinite(b):
         xs = np.geomspace(min(wds_unique) * 0.8, max(wds_unique) * 1.2, 50)
-        ax.plot(xs, C * xs ** b, color="#2ca02c", linestyle="--",
-                label=f"fit: η* = {C:.3f}·λ^{b:+.2f}")
+        ax.plot(
+            xs,
+            C * xs**b,
+            color="#2ca02c",
+            linestyle="--",
+            label=f"fit: η* = {C:.3f}·λ^{b:+.2f}",
+        )
         # Theory line: η* = constant * λ^1, anchored at the median wd
         wd_anchor = wds_unique[len(wds_unique) // 2]
         eta_anchor = medians[len(medians) // 2]
-        ax.plot(xs, eta_anchor / wd_anchor * xs, color="black", linestyle=":",
-                label="theory: η* ∝ λ¹")
+        ax.plot(
+            xs,
+            eta_anchor / wd_anchor * xs,
+            color="black",
+            linestyle=":",
+            label="theory: η* ∝ λ¹",
+        )
     for wd in regime_ii_wds:
         ax.axvline(wd, color="grey", alpha=0.3, linestyle=":")
-        ax.text(wd, 0.02, f"regime II", rotation=90, alpha=0.6, fontsize=8)
+        ax.text(wd, 0.02, "regime II", rotation=90, alpha=0.6, fontsize=8)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("weight decay λ")
@@ -310,45 +333,57 @@ def plot_fit(per_seed, fit, regime_ii_wds, out_path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--grid-dir", type=Path,
-                    default=Path("results/exp_c_grid"))
-    ap.add_argument("--output-dir", type=Path,
-                    default=Path("analysis"))
+    ap.add_argument("--grid-dir", type=Path, default=Path("results/exp_c_grid"))
+    ap.add_argument("--output-dir", type=Path, default=Path("analysis"))
     args = ap.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     rows = parse_grid(args.grid_dir)
     if not rows:
         raise SystemExit(f"no results found under {args.grid_dir}")
-    print(f"[info] loaded {len(rows)} runs across "
-          f"{len({(r['wd'], r['noise']) for r in rows})} cells")
+    print(
+        f"[info] loaded {len(rows)} runs across "
+        f"{len({(r['wd'], r['noise']) for r in rows})} cells"
+    )
 
     per_seed = per_seed_threshold(rows)
     # Detect regime II (every noise failed at this wd, every seed)
     regime_ii_wds = sorted({wd for (wd, _), e in per_seed.items() if e == 0.0})
     # Build λ array from the seed×wd map (excluding regime II)
-    pairs = [(w, e) for (w, _), e in per_seed.items()
-             if e > 0 and w not in regime_ii_wds]
+    pairs = [
+        (w, e) for (w, _), e in per_seed.items() if e > 0 and w not in regime_ii_wds
+    ]
     if not pairs:
         print("[warn] no usable (wd, η*) cells; only regime II detected.")
-        write_summary(args.output_dir / "threshold_theory_summary.md",
-                      rows, per_seed, (float("nan"), float("nan"), float("nan")),
-                      (float("nan"), float("nan")), regime_ii_wds)
+        write_summary(
+            args.output_dir / "threshold_theory_summary.md",
+            rows,
+            per_seed,
+            (float("nan"), float("nan"), float("nan")),
+            (float("nan"), float("nan")),
+            regime_ii_wds,
+        )
         return
     wd_arr = np.array([p[0] for p in pairs])
     eta_arr = np.array([p[1] for p in pairs])
     fit = fit_power_law(wd_arr, eta_arr)
-    ci = bootstrap_ci({k: v for k, v in per_seed.items()
-                       if v > 0 and k[0] not in regime_ii_wds})
+    ci = bootstrap_ci(
+        {k: v for k, v in per_seed.items() if v > 0 and k[0] not in regime_ii_wds}
+    )
     print(f"[fit] η* = {fit[0]:.4f} · λ^{fit[1]:+.3f}, R²={fit[2]:.3f}")
     print(f"[boot] 95% CI on exponent b: [{ci[0]:.3f}, {ci[1]:.3f}]")
 
-    write_summary(args.output_dir / "threshold_theory_summary.md",
-                  rows, per_seed, fit, ci, regime_ii_wds)
-    plot_fit(per_seed, fit, regime_ii_wds,
-             args.output_dir / "threshold_theory_fit.png")
-    print(f"[done] wrote {args.output_dir/'threshold_theory_summary.md'}")
-    print(f"[done] wrote {args.output_dir/'threshold_theory_fit.png'}")
+    write_summary(
+        args.output_dir / "threshold_theory_summary.md",
+        rows,
+        per_seed,
+        fit,
+        ci,
+        regime_ii_wds,
+    )
+    plot_fit(per_seed, fit, regime_ii_wds, args.output_dir / "threshold_theory_fit.png")
+    print(f"[done] wrote {args.output_dir / 'threshold_theory_summary.md'}")
+    print(f"[done] wrote {args.output_dir / 'threshold_theory_fit.png'}")
 
 
 if __name__ == "__main__":

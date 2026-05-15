@@ -57,10 +57,12 @@ def run_one(train_fraction: float, seed: int, output_root: str, max_steps: int):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fractions", type=str,
-                        default=",".join(f"{x:g}" for x in DEFAULT_FRACTIONS))
-    parser.add_argument("--seeds", type=str,
-                        default=",".join(str(s) for s in DEFAULT_SEEDS))
+    parser.add_argument(
+        "--fractions", type=str, default=",".join(f"{x:g}" for x in DEFAULT_FRACTIONS)
+    )
+    parser.add_argument(
+        "--seeds", type=str, default=",".join(str(s) for s in DEFAULT_SEEDS)
+    )
     parser.add_argument("--max-steps", type=int, default=50000)
     parser.add_argument("--output-dir", type=str, default="results/scarcity_baseline")
     parser.add_argument("--array-id", type=int, default=None)
@@ -69,18 +71,25 @@ def main():
     fractions = [float(x) for x in args.fractions.split(",") if x.strip()]
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
     tasks = build_tasks(fractions, seeds)
-    print(f"Total tasks: {len(tasks)} ({len(fractions)} fractions × {len(seeds)} seeds)")
+    print(f"Total tasks: {
+        len(tasks)} ({
+        len(fractions)} fractions × {
+        len(seeds)} seeds)")
 
     if args.array_id is not None:
         if not (0 <= args.array_id < len(tasks)):
-            raise SystemExit(f"--array-id {args.array_id} out of range [0, {len(tasks)})")
+            raise SystemExit(
+                f"--array-id {args.array_id} out of range [0, {len(tasks)})"
+            )
         train_fraction, seed = tasks[args.array_id]
         print(f"[array {args.array_id}] train_fraction={train_fraction} seed={seed}")
         run_one(train_fraction, seed, args.output_dir, args.max_steps)
         return
 
     for i, (train_fraction, seed) in enumerate(tasks):
-        print(f"\n{'='*60}\n[{i+1}/{len(tasks)}] train_fraction={train_fraction} seed={seed}\n{'='*60}")
+        print(
+            f"\n{'=' * 60}\n[{i + 1}/{len(tasks)}] train_fraction={train_fraction} seed={seed}\n{'=' * 60}"
+        )
         run_one(train_fraction, seed, args.output_dir, args.max_steps)
 
 

@@ -3,14 +3,19 @@ Progress measures for grokking analysis.
 Based on Chan et al. (2023) "Progress Measures for Grokking via Mechanistic Interpretability"
 """
 
-import torch
-import numpy as np
 import json
 from pathlib import Path
-from typing import List, Dict, Optional, Iterable
+from typing import Dict, Iterable, List, Optional
 
+import numpy as np
 
-SEVERITY_ORDER = ["pure", "low_collapse", "medium_collapse", "high_collapse", "severe_collapse"]
+SEVERITY_ORDER = [
+    "pure",
+    "low_collapse",
+    "medium_collapse",
+    "high_collapse",
+    "severe_collapse",
+]
 
 
 def iter_conditions_by_severity(results_dir: Path) -> Iterable[Path]:
@@ -42,8 +47,9 @@ def compute_generalization_gap(history: List[Dict]) -> List[float]:
     return [entry["test_loss"] - entry["train_loss"] for entry in history]
 
 
-def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
-                            threshold: float = 0.9) -> Optional[int]:
+def detect_phase_transition(
+    history: List[Dict], metric: str = "test_acc", threshold: float = 0.9
+) -> Optional[int]:
     """
     Detect the step at which a phase transition occurs.
     Returns the step number or None if no transition detected.
@@ -54,8 +60,9 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
     return None
 
 
-def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
-                           window: int = 10) -> List[Dict]:
+def compute_learning_speed(
+    history: List[Dict], metric: str = "test_acc", window: int = 10
+) -> List[Dict]:
     """Compute rate of change of a metric over a sliding window."""
     speeds = []
     for i in range(len(history)):
@@ -100,7 +107,7 @@ def memorization_phase_fourier_slope(history: List[Dict]) -> Optional[float]:
     if mem_idx is None:
         return None
     end_idx = grok_idx if grok_idx is not None else len(history) - 1
-    window = history[mem_idx:end_idx + 1]
+    window = history[mem_idx : end_idx + 1]
     if len(window) < 3:
         return None
     steps = np.array([e["step"] for e in window], dtype=float)
@@ -143,49 +150,58 @@ def weight_norm_decay_slope(history: List[Dict]) -> Optional[float]:
 def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     """
     Analyze the full grokking trajectory, identifying phases.
-    
+
     Phase 1: Memorization (train_acc rises, test_acc stays low)
     Phase 2: Circuit formation (fourier_concentration rises)
     Phase 3: Cleanup/grokking (test_acc jumps, weight_norm decreases)
     """
     if not history:
         return {"phases_detected": False}
-    
+
     # Find memorization completion (train_acc > 0.99)
     mem_complete_step = None
     for entry in history:
         if entry.get("train_acc", 0) > 0.99:
             mem_complete_step = entry["step"]
             break
-    
+
     # Find grokking step
     grok_step = detect_phase_transition(history, "test_acc", 0.95)
-    
+
     # Find circuit formation onset: sustained growth of Fourier concentration.
     # Track running mean over the last 5 eval steps; trigger when it crosses 0.1
     # while still monotonically increasing across the window. The previous
     # "50% jump in a single step" heuristic almost never fired because Fourier
-    # concentration grows smoothly during circuit formation rather than spiking.
+    # concentration grows smoothly during circuit formation rather than
+    # spiking.
     circuit_onset = None
     window = 5
     for i in range(window, len(history) + 1):
-        recent = [history[j].get("fourier_concentration", 0) for j in range(i - window, i)]
+        recent = [
+            history[j].get("fourier_concentration", 0) for j in range(i - window, i)
+        ]
         running_mean = sum(recent) / window
         monotonic = all(recent[k] <= recent[k + 1] for k in range(window - 1))
         if running_mean > 0.1 and monotonic:
             circuit_onset = history[i - 1]["step"]
             break
-    
+
     # Compute key metrics
     max_weight_norm = max(e.get("weight_norm", 0) for e in history) if history else 0
-    min_weight_norm = min(e.get("weight_norm", float('inf')) for e in history) if history else 0
-    
+    min_weight_norm = (
+        min(e.get("weight_norm", float("inf")) for e in history) if history else 0
+    )
+
     return {
         "phases_detected": True,
         "memorization_complete_step": mem_complete_step,
         "circuit_formation_onset": circuit_onset,
         "grokking_step": grok_step,
-        "delay_mem_to_grok": (grok_step - mem_complete_step) if (grok_step and mem_complete_step) else None,
+        "delay_mem_to_grok": (
+            (grok_step - mem_complete_step)
+            if (grok_step and mem_complete_step)
+            else None
+        ),
         "max_weight_norm": max_weight_norm,
         "min_weight_norm": min_weight_norm,
         "weight_norm_reduction": max_weight_norm - min_weight_norm,
@@ -197,8 +213,12 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
 def generate_comparison_table(results_dir: Path) -> str:
     """Generate a markdown comparison table of all conditions."""
     rows = []
-    rows.append("| Condition | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Embedding Rank |")
-    rows.append("|-----------|----------|---------------|----------------|---------------|----------------|")
+    rows.append(
+        "| Condition | Grokked? | Grokking Step | Final Test Acc | Fourier Conc. | Embedding Rank |"
+    )
+    rows.append(
+        "|-----------|----------|---------------|----------------|---------------|----------------|"
+    )
 
     for condition_dir in iter_conditions_by_severity(results_dir):
         try:
@@ -210,19 +230,20 @@ def generate_comparison_table(results_dir: Path) -> str:
             fc = f"{results.get('final_fourier_concentration', 0):.3f}"
             rank = f"{results.get('final_embedding_rank', 0):.1f}"
             rows.append(f"| {name} | {grokked} | {step} | {acc} | {fc} | {rank} |")
-        except Exception as e:
+        except Exception:
             rows.append(f"| {condition_dir.name} | Error | - | - | - | - |")
-    
+
     return "\n".join(rows)
 
 
 if __name__ == "__main__":
     import sys
+
     results_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("results")
-    
+
     print("Grokking-Collapse Experiment Analysis")
     print("=" * 60)
-    
+
     for condition_dir in iter_conditions_by_severity(results_dir):
         try:
             results = load_results(condition_dir)
@@ -232,6 +253,6 @@ if __name__ == "__main__":
                 print(f"  {k}: {v}")
         except Exception as e:
             print(f"\n{condition_dir.name}: Error - {e}")
-    
+
     print("\n" + "=" * 60)
     print(generate_comparison_table(results_dir))

@@ -29,6 +29,7 @@ PLOT_METRICS = [
 # Loading
 # ---------------------------------------------------------------------------
 
+
 def load_runs(results_dir: Path) -> List[dict]:
     runs = []
     for f in sorted(results_dir.glob("ratio_*_seed_*.json")):
@@ -54,6 +55,7 @@ def final_value(run: dict, metric: str) -> float:
 # ---------------------------------------------------------------------------
 # Plot 1: ratio vs final value (with error bars)
 # ---------------------------------------------------------------------------
+
 
 def plot_final_vs_ratio(groups: Dict[int, List[dict]], plots_dir: Path):
     plots_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +88,10 @@ def plot_final_vs_ratio(groups: Dict[int, List[dict]], plots_dir: Path):
 # Plot 2: training curves per metric, one line per ratio (mean across seeds)
 # ---------------------------------------------------------------------------
 
-def _aligned_curve(runs: List[dict], metric: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+def _aligned_curve(
+    runs: List[dict], metric: str
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (steps, mean, std) over seeds for a given metric."""
     series = []
     steps_ref = None
@@ -130,6 +135,7 @@ def plot_training_curves(groups: Dict[int, List[dict]], plots_dir: Path):
 # Plot 3: phase-transition detection (largest discrete derivative)
 # ---------------------------------------------------------------------------
 
+
 def detect_phase_transition(groups: Dict[int, List[dict]]) -> Dict[str, dict]:
     """For each metric, find the ratio with the largest |Δmean| between adjacent ratios."""
     out = {}
@@ -161,9 +167,11 @@ def plot_phase_transition(transitions: Dict[str, dict], plots_dir: Path):
     plots_dir.mkdir(parents=True, exist_ok=True)
     metrics = list(transitions.keys())
     deltas = [transitions[m]["delta"] for m in metrics]
-    edges = [f"{transitions[m]['transition_between_ratios'][0]}→"
-             f"{transitions[m]['transition_between_ratios'][1]}%"
-             for m in metrics]
+    edges = [
+        f"{transitions[m]['transition_between_ratios'][0]}→"
+        f"{transitions[m]['transition_between_ratios'][1]}%"
+        for m in metrics
+    ]
     fig, ax = plt.subplots(figsize=(7, 4))
     y = np.arange(len(metrics))
     ax.barh(y, deltas, color="steelblue")
@@ -181,6 +189,7 @@ def plot_phase_transition(transitions: Dict[str, dict], plots_dir: Path):
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -210,7 +219,9 @@ def main():
     }
     with open(results_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"[analyze] wrote plots to {plots_dir} and summary to {results_dir/'summary.json'}")
+    print(f"[analyze] wrote plots to {plots_dir} and summary to {
+            results_dir /
+            'summary.json'}")
 
 
 if __name__ == "__main__":

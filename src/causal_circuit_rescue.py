@@ -39,7 +39,7 @@ import argparse
 import json
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -52,9 +52,9 @@ import torch
 
 # Allow running as `python src/causal_circuit_rescue.py` or as a module.
 try:
-    from .model import ModularArithmeticTransformer
+    pass
 except ImportError:
-    from model import ModularArithmeticTransformer  # type: ignore
+    pass  # type: ignore
 
 
 CHECKPOINT_RE = re.compile(r"^checkpoint_(\d+)\.pt$")

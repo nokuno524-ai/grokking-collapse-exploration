@@ -20,17 +20,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import random
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import (
@@ -41,6 +39,7 @@ from transformers import (
 
 try:
     from peft import LoraConfig, TaskType, get_peft_model
+
     HAS_PEFT = True
 except ImportError:  # peft not installed yet
     HAS_PEFT = False
@@ -73,6 +72,7 @@ PROMPT_LEN = 32
 # Reproducibility / housekeeping
 # ---------------------------------------------------------------------------
 
+
 def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -85,9 +85,12 @@ def set_seed(seed: int) -> None:
 # Data
 # ---------------------------------------------------------------------------
 
+
 def collate(batch: List[Dict[str, List[int]]]) -> Dict[str, torch.Tensor]:
     input_ids = torch.tensor([b["input_ids"] for b in batch], dtype=torch.long)
-    attention_mask = torch.tensor([b["attention_mask"] for b in batch], dtype=torch.long)
+    attention_mask = torch.tensor(
+        [b["attention_mask"] for b in batch], dtype=torch.long
+    )
     return {"input_ids": input_ids, "attention_mask": attention_mask}
 
 
@@ -99,7 +102,9 @@ def resolve_train_path(data_root: Path, ratio_pct: int, seed: int, mode: str) ->
     """
     candidates = []
     if mode != "ai":
-        candidates.append(data_root / f"mode_{mode}" / f"ratio_{ratio_pct}" / f"seed_{seed}")
+        candidates.append(
+            data_root / f"mode_{mode}" / f"ratio_{ratio_pct}" / f"seed_{seed}"
+        )
     candidates.append(data_root / f"ratio_{ratio_pct}" / f"seed_{seed}")
     if ratio_pct == 0:
         candidates.append(data_root / "clean_train")
@@ -169,6 +174,7 @@ def take_eval_batches(
 # Model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TrainConfig:
     base_model: str = "gpt2-medium"
@@ -202,6 +208,7 @@ def build_model(cfg: TrainConfig, device: torch.device) -> torch.nn.Module:
 # Training
 # ---------------------------------------------------------------------------
 
+
 def train_one(
     ratio_pct: int,
     seed: int,
@@ -227,8 +234,10 @@ def train_one(
     set_seed(seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[train_real] ratio={ratio_pct}% seed={seed} device={device} "
-          f"mode={mode}", flush=True)
+    print(
+        f"[train_real] ratio={ratio_pct}% seed={seed} device={device} " f"mode={mode}",
+        flush=True,
+    )
 
     train_path = resolve_train_path(data_root, ratio_pct, seed, mode)
     test_path = data_root / "test"
@@ -239,7 +248,10 @@ def train_one(
         tokenizer.pad_token = tokenizer.eos_token
 
     train_loader, test_loader, calib_batch, prompt_input_ids = build_loaders(
-        train_path, test_path, batch_size=batch_size, seed=seed,
+        train_path,
+        test_path,
+        batch_size=batch_size,
+        seed=seed,
     )
     eval_batches_cache = take_eval_batches(test_loader, EVAL_BATCHES)
 
@@ -252,12 +264,16 @@ def train_one(
     model = build_model(cfg, device)
     n_total = sum(p.numel() for p in model.parameters())
     n_train = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"[train_real] model params: total={n_total:,} trainable={n_train:,}",
-          flush=True)
+    print(f"[train_real] model params: total={
+            n_total:,    } trainable={
+            n_train:,        }", flush=True)
 
     trainable = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(
-        trainable, lr=lr, weight_decay=weight_decay, betas=(0.9, 0.95),
+        trainable,
+        lr=lr,
+        weight_decay=weight_decay,
+        betas=(0.9, 0.95),
     )
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,
@@ -308,8 +324,13 @@ def train_one(
     # Step 0 metrics
     init_metrics = log_metrics(step=0, train_loss=float("nan"))
     history.append(init_metrics)
-    print(f"[train_real] step=0 ppl={init_metrics.get('perplexity', float('nan')):.3f} "
-          f"rank_last={init_metrics.get('repr_rank_last', 0):.2f}", flush=True)
+    print(f"[train_real] step=0 ppl={
+            init_metrics.get(
+                'perplexity',
+                float('nan')):.3f} " f"rank_last={
+            init_metrics.get(
+                'repr_rank_last',
+                0):.2f}", flush=True)
 
     step = 0
     micro_step = 0
@@ -345,16 +366,20 @@ def train_one(
                 )
                 loss = out.loss / grad_accum
             if torch.isnan(loss) or torch.isinf(loss):
-                print(f"[train_real] non-finite loss at micro_step={micro_step}, skipping",
-                      flush=True)
+                print(
+                    f"[train_real] non-finite loss at micro_step={micro_step}, skipping",
+                    flush=True,
+                )
                 optimizer.zero_grad(set_to_none=True)
                 continue
             scaler.scale(loss).backward()
             accum_loss += float(loss.item()) * grad_accum
         except torch.cuda.OutOfMemoryError:
             torch.cuda.empty_cache()
-            print(f"[train_real] OOM at micro_step={micro_step}; skipping batch",
-                  flush=True)
+            print(
+                f"[train_real] OOM at micro_step={micro_step}; skipping batch",
+                flush=True,
+            )
             optimizer.zero_grad(set_to_none=True)
             continue
 
@@ -390,22 +415,26 @@ def train_one(
                 flush=True,
             )
             with open(results_path, "w") as f:
-                json.dump({
-                    "ratio_pct": ratio_pct,
-                    "seed": seed,
-                    "mode": mode,
-                    "max_steps": max_steps,
-                    "batch_size": batch_size,
-                    "grad_accum": grad_accum,
-                    "lr": lr,
-                    "warmup_steps": warmup_steps,
-                    "weight_decay": weight_decay,
-                    "use_lora": use_lora,
-                    "lora_r": lora_r,
-                    "lora_alpha": lora_alpha,
-                    "base_model": base_model,
-                    "history": history,
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "ratio_pct": ratio_pct,
+                        "seed": seed,
+                        "mode": mode,
+                        "max_steps": max_steps,
+                        "batch_size": batch_size,
+                        "grad_accum": grad_accum,
+                        "lr": lr,
+                        "warmup_steps": warmup_steps,
+                        "weight_decay": weight_decay,
+                        "use_lora": use_lora,
+                        "lora_r": lora_r,
+                        "lora_alpha": lora_alpha,
+                        "base_model": base_model,
+                        "history": history,
+                    },
+                    f,
+                    indent=2,
+                )
 
         if ckpt_every > 0 and (step % ckpt_every == 0 or step == max_steps):
             save_ckpt(step)
@@ -417,15 +446,24 @@ def train_one(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ratio", type=float, required=True,
-                        help="Contamination ratio (0-1 or 0-100; >1 treated as percent)")
+    parser.add_argument(
+        "--ratio",
+        type=float,
+        required=True,
+        help="Contamination ratio (0-1 or 0-100; >1 treated as percent)",
+    )
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--data-root", type=str, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--output-dir", type=str, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--mode", type=str, default="ai",
-                        choices=["ai", "noise", "scarcity", "external", "self"])
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="ai",
+        choices=["ai", "noise", "scarcity", "external", "self"],
+    )
     parser.add_argument("--base-model", type=str, default="gpt2-medium")
     parser.add_argument("--max-steps", type=int, default=50000)
     parser.add_argument("--batch-size", type=int, default=4)
@@ -436,8 +474,11 @@ def main() -> None:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--log-every", type=int, default=LOG_EVERY)
     parser.add_argument("--ckpt-every", type=int, default=CKPT_EVERY)
-    parser.add_argument("--no-lora", action="store_true",
-                        help="Disable LoRA (full fine-tune; needs more VRAM)")
+    parser.add_argument(
+        "--no-lora",
+        action="store_true",
+        help="Disable LoRA (full fine-tune; needs more VRAM)",
+    )
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--lora-alpha", type=int, default=32)
     parser.add_argument("--no-amp", action="store_true", help="Disable AMP")

@@ -12,15 +12,21 @@ import argparse
 from pathlib import Path
 
 try:
-    from .train import TrainConfig, train
     from .data import get_all_conditions
+    from .train import TrainConfig, train
 except ImportError:
-    from train import TrainConfig, train
     from data import get_all_conditions
+    from train import TrainConfig, train
 
 
 DEFAULT_SEEDS = [42, 43, 44, 45, 46]
-CONDITION_ORDER = ["pure", "low_collapse", "medium_collapse", "high_collapse", "severe_collapse"]
+CONDITION_ORDER = [
+    "pure",
+    "low_collapse",
+    "medium_collapse",
+    "high_collapse",
+    "severe_collapse",
+]
 
 
 def build_tasks(seeds):
@@ -50,28 +56,43 @@ def run_one(seed: int, cond_name: str, cond_cfg, output_root: str, max_steps: in
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seeds", type=str, default=",".join(str(s) for s in DEFAULT_SEEDS),
-                        help="Comma-separated list of seeds (default: 42,43,44,45,46)")
+    parser.add_argument(
+        "--seeds",
+        type=str,
+        default=",".join(str(s) for s in DEFAULT_SEEDS),
+        help="Comma-separated list of seeds (default: 42,43,44,45,46)",
+    )
     parser.add_argument("--max-steps", type=int, default=50000)
     parser.add_argument("--output-dir", type=str, default="results/multi_seed")
-    parser.add_argument("--array-id", type=int, default=None,
-                        help="If set, run only the task with this index (for Slurm arrays)")
+    parser.add_argument(
+        "--array-id",
+        type=int,
+        default=None,
+        help="If set, run only the task with this index (for Slurm arrays)",
+    )
     args = parser.parse_args()
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
     tasks = build_tasks(seeds)
-    print(f"Total tasks: {len(tasks)} ({len(seeds)} seeds × {len(CONDITION_ORDER)} conditions)")
+    print(f"Total tasks: {
+        len(tasks)} ({
+        len(seeds)} seeds × {
+        len(CONDITION_ORDER)} conditions)")
 
     if args.array_id is not None:
         if not (0 <= args.array_id < len(tasks)):
-            raise SystemExit(f"--array-id {args.array_id} out of range [0, {len(tasks)})")
+            raise SystemExit(
+                f"--array-id {args.array_id} out of range [0, {len(tasks)})"
+            )
         seed, cond_name, cond_cfg = tasks[args.array_id]
         print(f"[array {args.array_id}] seed={seed} condition={cond_name}")
         run_one(seed, cond_name, cond_cfg, args.output_dir, args.max_steps)
         return
 
     for i, (seed, cond_name, cond_cfg) in enumerate(tasks):
-        print(f"\n{'='*60}\n[{i+1}/{len(tasks)}] seed={seed} condition={cond_name}\n{'='*60}")
+        print(
+            f"\n{'=' * 60}\n[{i + 1}/{len(tasks)}] seed={seed} condition={cond_name}\n{'=' * 60}"
+        )
         run_one(seed, cond_name, cond_cfg, args.output_dir, args.max_steps)
 
 

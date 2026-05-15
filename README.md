@@ -47,6 +47,14 @@ python src/transplant_rescue.py \
 - Default optimizer: AdamW, lr=1e-3, wd=1.0, batch=512, 50000 steps.
 - Default task: `(a+b) mod 59` with 30% train fraction.
 
+## Statistical Analysis and Comparison Tools
+
+This repository includes a suite of utilities for rigorous analysis of grokking dynamics and collapse effects:
+
+- **ExperimentAnalyzer (`src/analysis/results.py`)**: Computes summary statistics (mean, std, median, IQR), performs statistical significance testing across collapse conditions (t-tests, Mann-Whitney U, BCa bootstrap confidence intervals), computes effect sizes (Cohen's d), and outputs LaTeX-formatted tables.
+- **ComparisonFramework (`src/analysis/comparison.py`)**: Measures time-to-grokking (delayed generalization step detection), computes area-under-curve (AUC) for accuracy over time, detects phase transitions via discrete derivatives, and generates visualization plots (overlay accuracy curves, grokking step bar charts, final accuracy distribution violin plots).
+- **ExperimentManager (`src/management/experiments.py`)**: Tracks experiment metadata, loads complex `results.json` structures recursively, compares multiple experiments side-by-side using pandas DataFrames, filters best/worst runs by metric, and generates 1-page text-based experiment summary cards.
+
 ## Repository layout
 
 ```

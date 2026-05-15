@@ -19,16 +19,16 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _maybe_unwrap(model: torch.nn.Module) -> torch.nn.Module:
     """Unwrap PEFT / DDP wrappers to get to the bare HF model."""
@@ -55,14 +55,18 @@ def _transformer(model: torch.nn.Module):
     raise ValueError("Could not locate GPT-2 transformer backbone on model.")
 
 
-def _to_device(batch: Dict[str, torch.Tensor], device: torch.device) -> Dict[str, torch.Tensor]:
-    return {k: v.to(device) if isinstance(v, torch.Tensor) else v
-            for k, v in batch.items()}
+def _to_device(
+    batch: Dict[str, torch.Tensor], device: torch.device
+) -> Dict[str, torch.Tensor]:
+    return {
+        k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()
+    }
 
 
 # ---------------------------------------------------------------------------
 # 1) Held-out perplexity
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def held_out_perplexity(
@@ -103,6 +107,7 @@ def held_out_perplexity(
 # ---------------------------------------------------------------------------
 # 2) Layerwise effective rank of hidden states
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def _layerwise_hidden_states(
@@ -178,6 +183,7 @@ def representation_rank_layerwise(
 # 3) Weight norm drift (LoRA-aware)
 # ---------------------------------------------------------------------------
 
+
 def lora_weight_norms(
     model: torch.nn.Module,
     init_norms: Optional[Dict[str, float]] = None,
@@ -213,13 +219,15 @@ def lora_weight_norms(
 
 def snapshot_norms(model: torch.nn.Module) -> Dict[str, float]:
     """Capture initial trainable-parameter norms for later drift tracking."""
-    return {k: v for k, v in lora_weight_norms(model).items()
-            if not k.endswith("_drift")}
+    return {
+        k: v for k, v in lora_weight_norms(model).items() if not k.endswith("_drift")
+    }
 
 
 # ---------------------------------------------------------------------------
 # 4) Attention entropy across heads/layers
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def attention_pattern_entropy(
@@ -266,6 +274,7 @@ def attention_pattern_entropy(
 # 5) Feature density via PCA
 # ---------------------------------------------------------------------------
 
+
 @torch.no_grad()
 def feature_density_pca(
     model: torch.nn.Module,
@@ -302,6 +311,7 @@ def feature_density_pca(
 # ---------------------------------------------------------------------------
 # 6) Gradient topology
 # ---------------------------------------------------------------------------
+
 
 class GradientTopologyTracker:
     """Tracks cosine similarity between gradient snapshots over time.
@@ -354,6 +364,7 @@ class GradientTopologyTracker:
 # 7) N-gram diversity (for behavioral cross-check)
 # ---------------------------------------------------------------------------
 
+
 def _distinct_ngram_ratio(token_lists: List[List[int]], n: int) -> float:
     total = 0
     seen: Counter = Counter()
@@ -361,7 +372,7 @@ def _distinct_ngram_ratio(token_lists: List[List[int]], n: int) -> float:
         if len(toks) < n:
             continue
         for i in range(len(toks) - n + 1):
-            seen[tuple(toks[i:i + n])] += 1
+            seen[tuple(toks[i : i + n])] += 1
             total += 1
     if total == 0:
         return 0.0
@@ -418,6 +429,7 @@ def ngram_diversity_and_repetition(
 # Combined entry point
 # ---------------------------------------------------------------------------
 
+
 @torch.no_grad()
 def compute_all_metrics(
     model: torch.nn.Module,
@@ -439,9 +451,14 @@ def compute_all_metrics(
     # 1) perplexity
     metrics["perplexity"] = held_out_perplexity(model, eval_batches, device)
     # 2) layerwise effective rank
-    metrics.update(representation_rank_layerwise(
-        model, calibration_batch, device, n_components=n_pca_components,
-    ))
+    metrics.update(
+        representation_rank_layerwise(
+            model,
+            calibration_batch,
+            device,
+            n_components=n_pca_components,
+        )
+    )
     # 3) weight-norm drift
     metrics.update(lora_weight_norms(model, init_norms=init_norms))
     # 4) attention entropy
@@ -451,18 +468,28 @@ def compute_all_metrics(
         print(f"[metrics] attention entropy failed: {e}", flush=True)
     # 5) feature density
     try:
-        metrics.update(feature_density_pca(
-            model, calibration_batch, device, n_components=n_pca_components,
-        ))
+        metrics.update(
+            feature_density_pca(
+                model,
+                calibration_batch,
+                device,
+                n_components=n_pca_components,
+            )
+        )
     except Exception as e:
         print(f"[metrics] feature density failed: {e}", flush=True)
     # 6) ngram diversity / repetition
     try:
-        metrics.update(ngram_diversity_and_repetition(
-            model, prompt_input_ids, device,
-            max_new_tokens=max_new_tokens,
-            pad_token_id=pad_token_id, eos_token_id=eos_token_id,
-        ))
+        metrics.update(
+            ngram_diversity_and_repetition(
+                model,
+                prompt_input_ids,
+                device,
+                max_new_tokens=max_new_tokens,
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
+            )
+        )
     except Exception as e:
         print(f"[metrics] ngram diversity failed: {e}", flush=True)
 

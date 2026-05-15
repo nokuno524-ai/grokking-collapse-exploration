@@ -12,14 +12,13 @@ import math
 from collections import Counter
 from typing import Dict, Iterable, List, Optional, Tuple
 
-import numpy as np
 import torch
 import torch.nn.functional as F
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _last_attention_weight(model: torch.nn.Module) -> torch.Tensor:
     """
@@ -34,9 +33,13 @@ def _last_attention_weight(model: torch.nn.Module) -> torch.Tensor:
             return attn.c_attn.weight.detach()
         if hasattr(attn, "q_proj"):
             return torch.cat(
-                [attn.q_proj.weight.detach(),
-                 attn.k_proj.weight.detach(),
-                 attn.v_proj.weight.detach()], dim=0)
+                [
+                    attn.q_proj.weight.detach(),
+                    attn.k_proj.weight.detach(),
+                    attn.v_proj.weight.detach(),
+                ],
+                dim=0,
+            )
     last_w = None
     last_idx = -1
     for name, p in model.named_parameters():
@@ -78,6 +81,7 @@ def _hidden_states(
 # ---------------------------------------------------------------------------
 # 1) Held-out perplexity
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def perplexity(
@@ -125,6 +129,7 @@ def perplexity(
 # 2) Effective rank of last attention weight
 # ---------------------------------------------------------------------------
 
+
 @torch.no_grad()
 def attention_weight_rank(model: torch.nn.Module) -> float:
     """
@@ -142,6 +147,7 @@ def attention_weight_rank(model: torch.nn.Module) -> float:
 # ---------------------------------------------------------------------------
 # 3) Representation entropy (PCA explained-variance entropy)
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def representation_entropy(
@@ -172,6 +178,7 @@ def representation_entropy(
 # ---------------------------------------------------------------------------
 # 4) Directional concentration: cosine similarity of random hidden pairs
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def directional_concentration(
@@ -205,6 +212,7 @@ def directional_concentration(
 # 5) N-gram diversity on generated samples
 # ---------------------------------------------------------------------------
 
+
 def _distinct_ngram_ratio(token_lists: List[List[int]], n: int) -> float:
     total = 0
     seen: Counter = Counter()
@@ -212,7 +220,7 @@ def _distinct_ngram_ratio(token_lists: List[List[int]], n: int) -> float:
         if len(toks) < n:
             continue
         for i in range(len(toks) - n + 1):
-            seen[tuple(toks[i:i + n])] += 1
+            seen[tuple(toks[i : i + n])] += 1
             total += 1
     if total == 0:
         return 0.0
@@ -247,14 +255,13 @@ def ngram_diversity(
     out = model.generate(input_ids=prompt_input_ids, **gen_kwargs)
     prompt_len = prompt_input_ids.shape[1]
     generated = out[:, prompt_len:].cpu().tolist()
-    return {
-        f"distinct_{n}": _distinct_ngram_ratio(generated, n) for n in (2, 3, 4)
-    }
+    return {f"distinct_{n}": _distinct_ngram_ratio(generated, n) for n in (2, 3, 4)}
 
 
 # ---------------------------------------------------------------------------
 # Combined entry point
 # ---------------------------------------------------------------------------
+
 
 @torch.no_grad()
 def compute_all_metrics(
@@ -290,9 +297,12 @@ def compute_all_metrics(
     out["cos_sim_std"] = cos_std
     # 5) n-gram diversity
     diversity = ngram_diversity(
-        model, prompt_input_ids, device,
+        model,
+        prompt_input_ids,
+        device,
         max_new_tokens=max_new_tokens,
-        pad_token_id=pad_token_id, eos_token_id=eos_token_id,
+        pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
     )
     out.update(diversity)
 

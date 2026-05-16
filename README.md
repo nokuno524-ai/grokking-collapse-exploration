@@ -82,3 +82,50 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Phase Detection and Weight Analysis (New Tools)
+
+The repository now includes dedicated tools for phase transition detection, weight-level analysis, and Fourier spectrum analysis. These tools support quantitative definitions of grokking, memorization, and collapse.
+
+**1. Phase Transition Detector (`src/phase_detector.py`)**
+Detects training phases (memorization, transition, grokking, collapsed) based on accuracy metrics.
+
+```python
+from src.phase_detector import PhaseTransitionDetector
+
+detector = PhaseTransitionDetector()
+# Detect grokking point
+grok_step = detector.detect_grokking_point(train_acc, test_acc, train_threshold=0.9, test_threshold=0.9)
+
+# Compute phase labels for each training step
+labels = detector.compute_phase_labels(metrics_history)
+# Returns: ["learning", "learning", ..., "memorization", ..., "transition", ..., "grokking"]
+```
+
+**2. Weight Analyzer (`src/weight_analysis.py`)**
+Tracks weight norms and computes effective ranks using SVD.
+
+```python
+from src.weight_analysis import WeightAnalyzer
+
+analyzer = WeightAnalyzer()
+# Compute layer-wise L2 norms
+norms = analyzer.compute_weight_norms(model)
+
+# Compute effective rank of a weight matrix
+rank = analyzer.compute_effective_rank(model.embedding.weight, threshold=0.99)
+```
+
+**3. Fourier Feature Analyzer (`src/fourier_analysis.py`)**
+Analyzes the frequency spectrum of model representations.
+
+```python
+from src.fourier_analysis import FourierFeatureAnalyzer
+
+analyzer = FourierFeatureAnalyzer()
+# Compute frequency spectrum
+spectrum = analyzer.compute_frequency_spectrum(activations)
+
+# Plot spectrum heatmap over training time
+analyzer.plot_spectrum_heatmap(spectrum_history, "analysis/spectrum_heatmap.png")
+```

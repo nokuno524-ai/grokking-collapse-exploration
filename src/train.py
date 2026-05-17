@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
+from src.circuit_discovery import logit_attribution
 import os
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
@@ -213,6 +214,21 @@ def train(config: TrainConfig) -> TrainState:
                 print(f"🎉 GROKKING at step {step}! Test acc: {test_acc:.4f}")
             
             # Log
+            # Track interpretability metrics
+            try:
+                # Use a small test batch to compute attributions
+                test_inputs, _ = next(iter(test_loader))
+                test_inputs = test_inputs.to(device)
+                attrs = logit_attribution(model, test_inputs)
+
+                # We store the norm of the attribution as a scalar metric
+                attr_metrics = {
+                    "token_embed_direct_norm": attrs['token_embed_direct'].norm().item(),
+                    "pos_embed_direct_norm": attrs['pos_embed_direct'].norm().item()
+                }
+            except Exception as e:
+                attr_metrics = {}
+
             entry = {
                 "step": step,
                 "train_loss": train_loss,
@@ -222,6 +238,7 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "logit_attribution": attr_metrics,
             }
             state.history.append(entry)
             

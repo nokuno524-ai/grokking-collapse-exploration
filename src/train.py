@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
 import os
+import subprocess
+import hashlib
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List
@@ -131,6 +133,15 @@ def train(config: TrainConfig) -> TrainState:
     )
     train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
     
+    # Generate data hash for provenance tracking
+    data_bytes = train_in.cpu().numpy().tobytes() + train_tgt.cpu().numpy().tobytes()
+    data_hash = hashlib.sha256(data_bytes).hexdigest()
+
+    try:
+        git_commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], stderr=subprocess.DEVNULL).decode('utf-8').strip()
+    except Exception:
+        git_commit = "unknown"
+
     train_dataset = TensorDataset(train_in, train_tgt)
     test_dataset = TensorDataset(test_in, test_tgt)
 
@@ -249,6 +260,8 @@ def train(config: TrainConfig) -> TrainState:
     # Save final results
     results = {
         "config": asdict(config),
+        "data_hash": data_hash,
+        "git_commit": git_commit,
         "grokked": state.grokked,
         "grokking_step": state.grokking_step,
         "final_train_acc": state.train_acc,

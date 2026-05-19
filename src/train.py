@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
-import os
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List
@@ -169,6 +168,17 @@ def train(config: TrainConfig) -> TrainState:
     dataloader_iter = iter(train_loader)
     start_time = time.time()
     
+    # Initialize gradient tracker
+    try:
+        from .gradient_analysis import GradientTracker
+        grad_tracker = GradientTracker(model)
+    except ImportError:
+        import sys
+        from pathlib import Path
+        sys.path.append(str(Path(__file__).parent.parent))
+        from src.gradient_analysis import GradientTracker
+        grad_tracker = GradientTracker(model)
+
     for step in range(1, config.max_steps + 1):
         model.train()
         
@@ -188,6 +198,10 @@ def train(config: TrainConfig) -> TrainState:
         # Backward
         optimizer.zero_grad()
         loss.backward()
+
+        # Track gradients before step
+        grad_tracker.step(step)
+
         optimizer.step()
         
         state.step = step
@@ -238,6 +252,10 @@ def train(config: TrainConfig) -> TrainState:
         
         # Save checkpoint
         if step % config.save_every == 0:
+            # Save gradient plots periodically
+            grad_tracker.plot_gradient_norms(output_dir / "gradient_norms.png")
+            grad_tracker.plot_snr(output_dir / "gradient_snr.png")
+
             ckpt_path = output_dir / f"checkpoint_{step}.pt"
             torch.save({
                 "step": step,
@@ -259,6 +277,11 @@ def train(config: TrainConfig) -> TrainState:
         "history": state.history,
     }
     
+    # Save final gradient tracking data
+    grad_tracker.save_results(output_dir / "gradients")
+    grad_tracker.plot_gradient_norms(output_dir / "gradient_norms.png")
+    grad_tracker.plot_snr(output_dir / "gradient_snr.png")
+
     results_path = output_dir / "results.json"
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)

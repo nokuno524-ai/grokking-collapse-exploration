@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import random
 import time
@@ -16,7 +15,6 @@ from typing import Dict, List
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import (

@@ -28,6 +28,8 @@ The point is to answer three questions:
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
+import numpy as np
 
 import csv
 import json
@@ -39,8 +41,6 @@ from statistics import mean, stdev
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -113,7 +113,7 @@ def trajectory_signature(history):
     """
     if not history:
         return None
-    steps = [h["step"] for h in history]
+    [h["step"] for h in history]
     accs = [h.get("test_acc", 0.0) for h in history]
     train_accs = [h.get("train_acc", 0.0) for h in history]
     n = len(history)
@@ -125,8 +125,8 @@ def trajectory_signature(history):
             "late_slope": None,
             "tag": "too_short",
         }
-    q3 = mean(accs[3 * n // 4 :])
-    q2 = mean(accs[n // 2 : 3 * n // 4])
+    q3 = mean(accs[3 * n // 4:])
+    q2 = mean(accs[n // 2: 3 * n // 4])
     slope = q3 - q2
     final_test = accs[-1]
     final_train = train_accs[-1]

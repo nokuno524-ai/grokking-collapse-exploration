@@ -82,3 +82,20 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Analysis Tools
+
+The `src/` directory includes new modular analysis scripts, each featuring full docstrings and typed arguments:
+
+1. **Gradient Flow Analysis (`src/gradient_analysis.py`)**:
+   Tracks per-layer gradient norms, variance, and Signal-to-Noise Ratio (SNR) during the training loop. Identifies vanishing or exploding gradients. Can be attached to any PyTorch training loop via the `GradientTracker` class. Generates plots for L2 norm and SNR evolution.
+
+2. **Loss Landscape Visualization (`src/loss_landscape.py`)**:
+   Computes 1D slices and 2D contours of the loss landscape around a loaded model checkpoint. Random direction vectors are generated and filter-wise normalized to match the parameter scale (Li et al., 2018). Provides `plot_1d_slice` and `plot_2d_contour` for generating publication-quality matplotlib figures.
+
+3. **Fourier Analysis Tools (`src/fourier_tools.py`)**:
+   Generalizes Fourier spectrum calculation to detect periodic patterns indicative of grokking. Includes `compute_weight_fft` for weight matrices and `analyze_attention_frequencies` for attention heads. Contains `plot_frequency_evolution` to render a heatmap of frequencies over training steps.
+
+4. **Results Aggregation (`src/aggregate_results.py`)**:
+   A utility script to recursively scan output directories for `results.json` files, flatten nested metrics, and export them to a single CSV. Generates summary boxplots comparing test accuracy, grokking steps, and Fourier concentration across different conditions.
+   *Usage*: `python src/aggregate_results.py --results-dir results/ --output-dir analysis/summary/`

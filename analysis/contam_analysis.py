@@ -16,6 +16,7 @@ Outputs:
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
 
 import argparse
 import csv
@@ -29,7 +30,6 @@ import numpy as np
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 
 try:
     from scipy import stats as scipy_stats
@@ -321,6 +321,7 @@ def main():
         rho_p = t.get("spearman_p")
         tau = t.get("mk_tau")
         mk_p = t.get("mk_p")
+
         def _fmt(v):
             if v is None or (isinstance(v, float) and math.isnan(v)):
                 return "  -   "

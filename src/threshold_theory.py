@@ -78,19 +78,19 @@ b ≈ 1, contradicts it, or is too low-resolution to tell.
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
+import numpy as np
 
 import argparse
 import json
 import math
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 GROK_THRESHOLD = 0.95
@@ -295,7 +295,7 @@ def plot_fit(per_seed, fit, regime_ii_wds, out_path):
                 label="theory: η* ∝ λ¹")
     for wd in regime_ii_wds:
         ax.axvline(wd, color="grey", alpha=0.3, linestyle=":")
-        ax.text(wd, 0.02, f"regime II", rotation=90, alpha=0.6, fontsize=8)
+        ax.text(wd, 0.02, "regime II", rotation=90, alpha=0.6, fontsize=8)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("weight decay λ")

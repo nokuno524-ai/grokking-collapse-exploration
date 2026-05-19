@@ -12,7 +12,6 @@ import math
 from collections import Counter
 from typing import Dict, Iterable, List, Optional, Tuple
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 

@@ -34,27 +34,27 @@ Usage:
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
+import torch
+import numpy as np
 
 import argparse
 import json
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import torch
 
 # Allow running as `python src/causal_circuit_rescue.py` or as a module.
 try:
     from .model import ModularArithmeticTransformer
 except ImportError:
-    from model import ModularArithmeticTransformer  # type: ignore
+    from model import ModularArithmeticTransformer  # noqa: F401, type: ignore
 
 
 CHECKPOINT_RE = re.compile(r"^checkpoint_(\d+)\.pt$")

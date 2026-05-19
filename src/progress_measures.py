@@ -3,7 +3,6 @@ Progress measures for grokking analysis.
 Based on Chan et al. (2023) "Progress Measures for Grokking via Mechanistic Interpretability"
 """
 
-import torch
 import numpy as np
 import json
 from pathlib import Path
@@ -143,24 +142,24 @@ def weight_norm_decay_slope(history: List[Dict]) -> Optional[float]:
 def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     """
     Analyze the full grokking trajectory, identifying phases.
-    
+
     Phase 1: Memorization (train_acc rises, test_acc stays low)
     Phase 2: Circuit formation (fourier_concentration rises)
     Phase 3: Cleanup/grokking (test_acc jumps, weight_norm decreases)
     """
     if not history:
         return {"phases_detected": False}
-    
+
     # Find memorization completion (train_acc > 0.99)
     mem_complete_step = None
     for entry in history:
         if entry.get("train_acc", 0) > 0.99:
             mem_complete_step = entry["step"]
             break
-    
+
     # Find grokking step
     grok_step = detect_phase_transition(history, "test_acc", 0.95)
-    
+
     # Find circuit formation onset: sustained growth of Fourier concentration.
     # Track running mean over the last 5 eval steps; trigger when it crosses 0.1
     # while still monotonically increasing across the window. The previous
@@ -175,11 +174,11 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
         if running_mean > 0.1 and monotonic:
             circuit_onset = history[i - 1]["step"]
             break
-    
+
     # Compute key metrics
     max_weight_norm = max(e.get("weight_norm", 0) for e in history) if history else 0
     min_weight_norm = min(e.get("weight_norm", float('inf')) for e in history) if history else 0
-    
+
     return {
         "phases_detected": True,
         "memorization_complete_step": mem_complete_step,
@@ -210,19 +209,19 @@ def generate_comparison_table(results_dir: Path) -> str:
             fc = f"{results.get('final_fourier_concentration', 0):.3f}"
             rank = f"{results.get('final_embedding_rank', 0):.1f}"
             rows.append(f"| {name} | {grokked} | {step} | {acc} | {fc} | {rank} |")
-        except Exception as e:
+        except Exception:
             rows.append(f"| {condition_dir.name} | Error | - | - | - | - |")
-    
+
     return "\n".join(rows)
 
 
 if __name__ == "__main__":
     import sys
     results_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("results")
-    
+
     print("Grokking-Collapse Experiment Analysis")
     print("=" * 60)
-    
+
     for condition_dir in iter_conditions_by_severity(results_dir):
         try:
             results = load_results(condition_dir)
@@ -232,6 +231,6 @@ if __name__ == "__main__":
                 print(f"  {k}: {v}")
         except Exception as e:
             print(f"\n{condition_dir.name}: Error - {e}")
-    
+
     print("\n" + "=" * 60)
     print(generate_comparison_table(results_dir))

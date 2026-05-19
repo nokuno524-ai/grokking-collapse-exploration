@@ -82,3 +82,7 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Experiment Framework
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for full details on how to use YAML configs to define parameters, run grid sweeps, submit to Slurm clusters, and generate the static HTML analysis dashboard.

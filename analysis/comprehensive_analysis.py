@@ -28,6 +28,8 @@ The script makes them comparable by:
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
+import numpy as np
 
 import csv
 import json
@@ -40,8 +42,6 @@ from typing import Dict, List
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 
 try:
     from scipy import stats as scipy_stats
@@ -321,7 +321,8 @@ def overview_plot(grid_rows, contam_rows, out_path):
                 xs.append(noise)
                 ys.append(mean(cell))
                 errs.append(stdev(cell) if len(cell) > 1 else 0.0)
-            ys_a = np.array(ys); errs_a = np.array(errs)
+            ys_a = np.array(ys)
+            errs_a = np.array(errs)
             axes[0].plot(xs, ys_a, marker="o", color=color, label=f"wd={wd:g}")
             axes[0].fill_between(xs, ys_a - errs_a, ys_a + errs_a,
                                  color=color, alpha=0.2)

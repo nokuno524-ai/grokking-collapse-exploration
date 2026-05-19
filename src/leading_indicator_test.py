@@ -30,6 +30,8 @@ genuinely a leading test, not a smuggled-in test of the outcome.
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
+import numpy as np
 
 import argparse
 import json
@@ -40,8 +42,6 @@ from typing import List, Dict, Optional, Tuple
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 WINDOW_FRAC = 0.30  # fraction of post-memorization window to compute the slope on
@@ -180,7 +180,7 @@ def plot_scatter(rows: List[Dict], out_path: Path):
     grok = np.array([r["grokked"] for r in rows])
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
     for color, label, mask in [("#2ca02c", "grokked", grok),
-                                ("#d62728", "no grok", ~grok)]:
+                               ("#d62728", "no grok", ~grok)]:
         axes[0].scatter(fc[mask], np.zeros(mask.sum()) + np.random.uniform(-0.05, 0.05, mask.sum()),
                         color=color, alpha=0.6, label=label, s=18)
         axes[1].scatter(wn[mask], np.zeros(mask.sum()) + np.random.uniform(-0.05, 0.05, mask.sum()),

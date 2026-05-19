@@ -11,6 +11,8 @@ Run with the project venv:  bash run_in_venv.sh python3 analysis/grid_analysis.p
 """
 
 from __future__ import annotations
+import matplotlib.pyplot as plt
+import numpy as np
 
 import csv
 import json
@@ -22,8 +24,6 @@ from statistics import mean, median, stdev
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -145,7 +145,8 @@ def write_summary_md(rows, agg, levels, severities, path):
     lines = []
     lines.append("# Grid Sweep Summary (level × severity × seed)\n")
     lines.append(f"Total runs collected: **{len(rows)}**\n")
-    cells = {(L, S): [r for r in rows if math.isclose(r['level'], L) and math.isclose(r['severity'], S)] for L in levels for S in severities}
+    cells = {(L, S): [r for r in rows if math.isclose(r['level'], L) and math.isclose(r['severity'], S)]
+             for L in levels for S in severities}
     missing = [k for k, v in cells.items() if len(v) < 5]
     if missing:
         lines.append("Cells with <5 seeds:\n")

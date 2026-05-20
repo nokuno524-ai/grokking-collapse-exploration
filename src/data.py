@@ -6,29 +6,26 @@ to simulate model collapse.
 
 import torch
 import numpy as np
+from src.management.config import DatasetConfig
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
+from collections import Counter
 
 
-@dataclass
-class DatasetConfig:
-    """Configuration for dataset generation."""
-    prime: int = 59  # Modular arithmetic modulus
-    train_fraction: float = 0.3  # Fraction of data for training
-    collapse_level: float = 0.0  # Fraction of training data replaced by synthetic
-    collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
-    noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
-    seed: int = 42
 
 
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Generate (a, b) -> (a + b) mod p dataset.
     
+    Args:
+        config (DatasetConfig): Configuration object containing generation parameters.
+
     Returns:
-        train_inputs, train_targets, test_inputs, test_targets
-        Inputs are (a, b) pairs encoded as token indices.
-        Targets are (a + b) mod p.
+        Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+            train_inputs, train_targets, test_inputs, test_targets.
+            Inputs are (a, b) pairs encoded as token indices.
+            Targets are (a + b) mod p.
     """
     p = config.prime
     rng = np.random.RandomState(config.seed)
@@ -72,9 +69,9 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
 
 
 def apply_collapse(
-    pairs: list, targets: list, prime: int,
+    pairs: List[Tuple[int, int]], targets: List[int], prime: int,
     collapse_level: float, collapse_severity: float, rng: np.random.RandomState
-) -> Tuple[list, list]:
+) -> Tuple[List[Tuple[int, int]], List[int]]:
     """
     Simulate model collapse by replacing some targets with outputs from a "collapsed" model.
     
@@ -82,12 +79,22 @@ def apply_collapse(
     - Narrowed output distribution (favors common results)
     - Occasional errors (assigns probability mass incorrectly)
     - Loss of rare outputs
+
+    Args:
+        pairs (List[Tuple[int, int]]): The input pairs.
+        targets (List[int]): The corresponding targets.
+        prime (int): The prime modulus.
+        collapse_level (float): The fraction of data to replace.
+        collapse_severity (float): How severe the collapse is (0.0 to 1.0).
+        rng (np.random.RandomState): Random state for determinism.
+
+    Returns:
+        Tuple[List[Tuple[int, int]], List[int]]: The potentially modified pairs and targets.
     """
     n_replace = int(len(targets) * collapse_level)
     replace_idx = rng.choice(len(targets), n_replace, replace=False)
     
     # Compute target frequency distribution
-    from collections import Counter
     target_counts = Counter(targets)
     total = len(targets)
     freq = {t: c / total for t, c in target_counts.items()}
@@ -122,13 +129,23 @@ def apply_collapse(
 
 
 def apply_label_noise(
-    pairs: list, targets: list, prime: int,
+    pairs: List[Tuple[int, int]], targets: List[int], prime: int,
     noise_fraction: float, rng: np.random.RandomState,
-) -> Tuple[list, list]:
+) -> Tuple[List[Tuple[int, int]], List[int]]:
     """
     Replace a fraction of training labels with uniform random labels in [0, prime).
     The new label is drawn uniformly from the (prime-1) values different from the original
     so the corruption is always observable.
+
+    Args:
+        pairs (List[Tuple[int, int]]): The input pairs.
+        targets (List[int]): The corresponding targets.
+        prime (int): The prime modulus.
+        noise_fraction (float): The fraction of data to corrupt.
+        rng (np.random.RandomState): Random state for determinism.
+
+    Returns:
+        Tuple[List[Tuple[int, int]], List[int]]: The potentially modified pairs and targets.
     """
     n_replace = int(len(targets) * noise_fraction)
     if n_replace == 0:
@@ -146,8 +163,17 @@ def apply_label_noise(
     return new_pairs, new_targets
 
 
-def get_all_conditions(prime: int = 59, seed: int = 42) -> dict:
-    """Get all experimental conditions."""
+def get_all_conditions(prime: int = 59, seed: int = 42) -> Dict[str, DatasetConfig]:
+    """
+    Get all experimental conditions.
+
+    Args:
+        prime (int): The prime modulus.
+        seed (int): The base random seed.
+
+    Returns:
+        Dict[str, DatasetConfig]: A dictionary mapping condition names to DatasetConfig objects.
+    """
     return {
         "pure": DatasetConfig(prime=prime, collapse_level=0.0, seed=seed),
         "low_collapse": DatasetConfig(prime=prime, collapse_level=0.05, collapse_severity=0.3, seed=seed),

@@ -30,8 +30,23 @@ class ModularArithmeticTransformer(nn.Module):
         d_ff: int = 512,
         n_layers: int = 1,
         dropout: float = 0.0,
-    ):
+    ) -> None:
+        """
+        Initialize the ModularArithmeticTransformer.
+
+        Args:
+            prime (int): The prime modulus for the arithmetic task.
+            d_model (int): The embedding dimension.
+            n_heads (int): The number of attention heads.
+            d_ff (int): The feedforward network dimension.
+            n_layers (int): The number of transformer layers.
+            dropout (float): The dropout rate.
+        """
         super().__init__()
+        assert d_model % n_heads == 0, "d_model must be divisible by n_heads"
+        assert prime > 0, "prime must be positive"
+        assert n_layers > 0, "n_layers must be positive"
+
         self.prime = prime
         self.d_model = d_model
         self.n_heads = n_heads
@@ -61,7 +76,7 @@ class ModularArithmeticTransformer(nn.Module):
         
         self._init_weights()
     
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         """Initialize weights with small random values."""
         for module in self.modules():
             if isinstance(module, nn.Linear):
@@ -79,8 +94,12 @@ class ModularArithmeticTransformer(nn.Module):
             x: Input tensor of shape (batch, 2) with values in [0, prime)
         
         Returns:
-            Logits of shape (batch, prime)
+            torch.Tensor: Logits of shape (batch, prime)
         """
+        assert x.ndim == 2, "Input must have 2 dimensions (batch, seq_len)"
+        assert x.shape[1] == 2, "Sequence length must be 2 for modular arithmetic pairs"
+        assert (x >= 0).all() and (x < self.prime).all(), "Input values must be in [0, prime)"
+
         batch_size = x.shape[0]
         
         # Token embeddings
@@ -111,6 +130,9 @@ class ModularArithmeticTransformer(nn.Module):
         """
         Compute the Fourier spectrum of the token embedding matrix.
         Returns the magnitude of the DFT of each embedding dimension.
+
+        Returns:
+            torch.Tensor: Magnitude spectrum of shape (prime, d_model)
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
         # DFT along the token dimension
@@ -118,7 +140,12 @@ class ModularArithmeticTransformer(nn.Module):
         return spectrum
     
     def get_embedding_rank(self) -> float:
-        """Compute effective rank of the embedding matrix."""
+        """
+        Compute effective rank of the embedding matrix using Shannon entropy of singular values.
+
+        Returns:
+            float: The effective rank.
+        """
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
         s = s / s.sum()
@@ -130,7 +157,15 @@ GrokkingTransformer = ModularArithmeticTransformer
 
 
 def count_parameters(model: nn.Module) -> int:
-    """Count trainable parameters."""
+    """
+    Count trainable parameters in a PyTorch module.
+
+    Args:
+        model (nn.Module): The model to count parameters for.
+
+    Returns:
+        int: The number of trainable parameters.
+    """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 

@@ -10,73 +10,35 @@ import json
 import time
 import os
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import Optional, List
+from dataclasses import asdict
+from src.management.config import TrainConfig, TrainState, DatasetConfig
+from typing import Optional, List, Tuple, Dict, Any
 
 try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
-    from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .data import generate_modular_arithmetic, get_all_conditions
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
-    from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from data import generate_modular_arithmetic, get_all_conditions
 
 
-@dataclass
-class TrainConfig:
-    """Training configuration."""
-    # Model
-    prime: int = 59
-    d_model: int = 128
-    n_heads: int = 4
-    d_ff: int = 512
-    n_layers: int = 1
-    
-    # Training
-    max_steps: int = 50000
-    lr: float = 1e-3
-    weight_decay: float = 1.0  # Key hyperparameter for grokking!
-    batch_size: int = 512
-    
-    # Logging
-    eval_every: int = 100
-    log_every: int = 50
-    save_every: int = 5000
-    
-    # Data
-    collapse_level: float = 0.0
-    collapse_severity: float = 0.5
-    train_fraction: float = 0.3
-    noise_fraction: float = 0.0
-    seed: int = 42
-    
-    # Output
-    output_dir: str = "results"
-    condition_name: str = "default"
 
 
-@dataclass
-class TrainState:
-    """Tracks training state and metrics."""
-    step: int = 0
-    train_loss: float = float('inf')
-    test_loss: float = float('inf')
-    train_acc: float = 0.0
-    test_acc: float = 0.0
-    weight_norm: float = 0.0
-    embedding_rank: float = 0.0
-    fourier_concentration: float = 0.0
-    grokked: bool = False
-    grokking_step: Optional[int] = None
-    grokking_threshold: float = 0.95
-    history: List[dict] = field(default_factory=list)
 
 
 def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: int = 5) -> float:
     """
     Measure how concentrated the Fourier spectrum is on the top-k frequencies.
     High concentration → grokking has occurred (or is occurring).
+
+    Args:
+        model (ModularArithmeticTransformer): The transformer model.
+        top_k (int): Number of top frequencies to consider.
+
+    Returns:
+        float: The Fourier concentration value in [0, 1].
     """
     spectrum = model.get_embedding_fourier_spectrum()  # (prime, d_model)
     # Average across embedding dimensions
@@ -90,7 +52,7 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
-def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
+def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> Tuple[float, float]:
     """Evaluate model, return (loss, accuracy)."""
     model.eval()
     total_loss = 0.0
@@ -116,9 +78,15 @@ def train(config: TrainConfig) -> TrainState:
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
     
-    # Set seeds
+    # Set seeds for complete determinism
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
+    import numpy as np
+    import random
+    np.random.seed(config.seed)
+    random.seed(config.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Generate data
     data_config = DatasetConfig(
@@ -136,9 +104,16 @@ def train(config: TrainConfig) -> TrainState:
 
     loader_generator = torch.Generator()
     loader_generator.manual_seed(config.seed)
+
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+
     train_loader = DataLoader(
         train_dataset, batch_size=config.batch_size, shuffle=True,
         generator=loader_generator,
+        worker_init_fn=seed_worker,
     )
     test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
     
@@ -269,7 +244,7 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> Dict[str, Dict[str, Any]]:
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}

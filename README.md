@@ -11,6 +11,31 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 3. **Noise ≡ "model-collapse" contamination at matched rate.** At noise=0.15, random-label noise and temperature-warped collapse contamination produce statistically indistinguishable test-acc and Fourier-concentration distributions (n=5 each). The original "collapse is a distinct phenomenon" framing is **refuted by our own baseline**.
 4. **Scarcity dissociation.** At 50% less training data, the model still groks and Fourier concentration is *higher* than at full data — while at 15% corrupted data it does not grok. This rules out "contamination = effective sample-size shrinkage" as the mechanism.
 
+
+
+## Methodology
+
+We evaluate model grokking using a 1-layer Transformer trained on a modular arithmetic task `(a + b) mod p` (where p=59). To simulate data collapse, we replace fractions of the training set with synthetically generated (and progressively corrupted) targets.
+
+1.  **Pure Model:** Full clean dataset.
+2.  **Collapsed Models:** Various fractions of target labels are replaced with the outputs of a "collapsed" generator (narrowed distribution, errors).
+3.  **Metrics:** We track test accuracy, loss, weight norm, embedding rank, and Fourier concentration of embeddings across 50k training steps.
+
+## New Visualizations and Dashboard
+
+We provide a comprehensive suite of visualization scripts located in `src/analysis/`. These generate insights on capability emergence, phase transitions, weight norms, attention patterns, and loss landscapes.
+
+To view these, run the dashboard generator:
+```bash
+python src/analysis/plot_capability_curves.py
+python src/analysis/plot_phase_transitions.py
+python src/analysis/plot_weight_norms.py
+python src/analysis/plot_attention.py
+python src/analysis/plot_loss_landscape.py
+python src/analysis/generate_dashboard.py
+```
+Open `analysis/dashboard.html` in a web browser.
+
 ## Status (2026-05-10)
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.

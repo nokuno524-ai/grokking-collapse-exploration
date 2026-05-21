@@ -73,6 +73,33 @@ analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
 
+## Analysis Pipeline
+
+The comprehensive analysis pipeline has been extended to study the interplay between model collapse and grokking:
+
+1. **Results Aggregation & Report Generation**: Summarize JSON logs into pandas DataFrames and generate publication-ready plots (Accuracy vs Steps, Fourier Concentration) using `src/analysis/results_aggregator.py`.
+2. **Weight Trajectory Visualization**: Visualize the overall reduction in weight norms during training, annotating exact grokking transition points (`src/analysis/weight_trajectory.py`).
+3. **Phase Transition Detection**: Automatically identify precise grokking boundaries (when test accuracy crosses and remains above a threshold) and detect phase shifts in Fourier concentration from uniform to concentrated states (`src/analysis/phase_detector.py`).
+4. **Attention Pattern Evolution**: Extract attention weights directly from saved model checkpoints to study how attention allocation (e.g., pos 0 vs pos 1) changes before, during, and after grokking, comparing patterns across varying levels of model collapse (`src/analysis/attention_analysis.py`).
+
+### Visualization Guide
+
+To reproduce the analysis plots from trained models, use the provided tools:
+
+```bash
+# 1. Aggregate results and plot accuracy/fourier trajectories
+python -c "from src.analysis.results_aggregator import plot_aggregated_results, generate_markdown_report; from pathlib import Path; plot_aggregated_results(Path('results'), Path('analysis/output')); generate_markdown_report(Path('results'), Path('analysis/output/report.md'))"
+
+# 2. Plot weight norms per layer across conditions
+python -c "from src.analysis.weight_trajectory import plot_weight_trajectories; from pathlib import Path; plot_weight_trajectories(Path('results'), Path('analysis/output/weight_trajectories.png'))"
+
+# 3. Visualize attention evolution for the pure condition
+python -c "from src.analysis.attention_analysis import plot_attention_evolution; from pathlib import Path; plot_attention_evolution(Path('results/pure'), Path('analysis/output/attention'))"
+
+# 4. Compare attention patterns across all conditions at a specific step
+python -c "from src.analysis.attention_analysis import compare_collapse_attention; from pathlib import Path; compare_collapse_attention(Path('results'), Path('analysis/output/attention_comparison.png'), step=50000)"
+```
+
 ## References
 
 - Power et al. (2022), *Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets*.

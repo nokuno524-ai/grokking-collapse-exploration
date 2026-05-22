@@ -1,0 +1,47 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+
+\title{Grokking Cliffs: Label-Noise Rate, Weight Decay, and the Scarcity Dissociation}
+\author{Anonymous Authors}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper investigates how model collapse affects the grokking phenomenon in modular arithmetic transformers. We demonstrate that pure data results in grokking at step 1400, while severe collapse prevents grokking entirely. We additionally show that weight decay acts as a second-axis cliff.
+\end{abstract}
+
+\section{Introduction}
+Grokking, the phenomenon where a model transitions from overfitting to perfect generalization after extended training \cite{power2022grokking}, is well-studied in algorithmic datasets. Simultaneously, progress measures \cite{chan2023progress} have helped formalize this behavior mechanistically. Model collapse \cite{dohmatob2024tale} occurs when generative models are trained recursively on AI-generated data. This study bridges the gap, investigating how collapse severity impacts the delayed generalization of small transformers.
+
+\section{Methods}
+We employ a 1-layer Transformer encoder with $d_{model}=128$, 4 heads, and $d_{ff}=512$ on the $(a+b) \pmod{59}$ task. Data contamination replaces true labels with noise at different rates (low, medium, high, severe).
+
+\section{Results}
+
+Our main experiments trace test accuracy and Fourier concentration.
+\begin{figure}[h]
+    \centering
+    % \includegraphics[width=\linewidth]{../analysis/comprehensive_overview.png}
+    \caption{Comprehensive overview of grokking across collapse severities. Pure data groks early; severe collapse prevents grokking.}
+    \label{fig:main_grokking}
+\end{figure}
+
+Hyperparameter sweeps show weight decay's critical role:
+\begin{figure}[h]
+    \centering
+    % \includegraphics[width=\linewidth]{../analysis/hyperparam_sensitivity.png}
+    \caption{Hyperparameter sensitivity. Heatmaps showing grokking probability based on weight decay and learning rate.}
+    \label{fig:sensitivity}
+\end{figure}
+
+\section{Discussion}
+Severe collapse acts mechanically like label noise, disrupting the coherent circuit formation necessary for phase transitions. Future work will investigate theoretical thresholds.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

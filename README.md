@@ -82,3 +82,25 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Analysis & Visualization Pipeline
+
+To analyze experimental results and generate publication-quality figures, follow these steps:
+
+1. **Attention Visualizations**:
+   Generates heatmaps, attention evolution over time, and cross-condition comparisons.
+   ```bash
+   PYTHONPATH=. python src/attention_viz.py
+   ```
+
+2. **Results Aggregation and Statistical Testing**:
+   Compiles JSON results into DataFrames and generates Markdown reports in `analysis/`.
+   ```bash
+   PYTHONPATH=. python src/analysis/analyze_results.py
+   ```
+
+3. **Publication-Quality Figures**:
+   Generates `fig1_main_results`, `fig2_grokking_timing`, and `fig3_weight_fourier` in PDF and PNG formats to `analysis/paper/`.
+   ```bash
+   PYTHONPATH=. python src/analysis/paper_figures.py
+   ```

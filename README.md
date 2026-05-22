@@ -82,3 +82,29 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Reproducibility Guide
+
+A complete reproduction pack is available in the `reproduce/` directory.
+
+- `reproduce/run_all.sh`: Sets up a virtual environment, installs pinned dependencies, and runs the entire pipeline (including hyperparameter sensitivity and seed analysis).
+- `reproduce/requirements.txt`: Exact dependency hashes generated via `uv pip compile`.
+- `reproduce/README.md`: Detailed expected runtimes and instructions.
+
+## Figure Generation Checklist
+
+Analysis scripts in `analysis/` will generate the necessary figures. Running the reproducibility pack will automatically run these steps.
+
+1. `python src/analysis.py`: Main comprehensive grokking vs collapse summary plot.
+2. `python analysis/hyperparam_sensitivity.py --plot`: Grid heatmaps for learning rate and weight decay.
+3. `python analysis/seed_analysis.py --plot`: Bar charts showing robust errors across seeds for grokking delay and final accuracy.
+
+## Paper Writing
+
+A LaTeX paper draft template is located in `paper/`.
+To build the paper, enter the `paper/` directory and use the included Makefile:
+```bash
+cd paper/
+make
+```
+This will compile `main.tex` and process references from `references.bib` via `pdflatex` and `bibtex`.

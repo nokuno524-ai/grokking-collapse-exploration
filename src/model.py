@@ -125,6 +125,65 @@ class ModularArithmeticTransformer(nn.Module):
         entropy = -(s * torch.log(s + 1e-10)).sum()
         return torch.exp(entropy).item()
 
+    def get_attention_snapshots(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Get attention maps for a batch of inputs from the first transformer layer.
+        Returns:
+            Attention weights of shape (batch, n_heads, seq_len, seq_len)
+        """
+        batch_size = x.shape[0]
+        tok = self.token_embed(x)
+        positions = torch.arange(2, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        pos = self.pos_embed(positions)
+        h = tok + pos
+
+        # We extract from the first encoder layer
+        # The self_attn returns (attn_output, attn_weights) when need_weights=True
+        # attn_weights shape: (batch, seq_len, seq_len) if average_attn_weights=True (default in some versions)
+        # We need per-head weights, so we set average_attn_weights=False (if supported) or rely on the extraction
+        layer = self.transformer.layers[0]
+
+        # manual extraction using self_attn
+        attn_output, attn_weights = layer.self_attn(
+            h, h, h,
+            need_weights=True,
+            average_attn_weights=False
+        )
+        # For batch_first=True, PyTorch MultiheadAttention returns (batch, num_heads, seq_len, seq_len)
+        # when average_attn_weights=False.
+        return attn_weights.detach()
+
+    def get_svd_spectra(self) -> dict:
+        """
+        Get SVD spectra (singular values) for major weight matrices.
+        Returns:
+            Dictionary mapping layer names to their singular values (list of floats).
+        """
+        spectra = {}
+        with torch.no_grad():
+            W_embed = self.token_embed.weight.detach()
+            spectra["token_embed"] = torch.linalg.svdvals(W_embed).cpu().tolist()
+
+            W_out = self.output_head.weight.detach()
+            spectra["output_head"] = torch.linalg.svdvals(W_out).cpu().tolist()
+
+            # Extract from first transformer layer
+            layer = self.transformer.layers[0]
+
+            # W_q, W_k, W_v are combined in in_proj_weight for MultiheadAttention
+            if layer.self_attn.in_proj_weight is not None:
+                W_in_proj = layer.self_attn.in_proj_weight.detach()
+                spectra["attn_in_proj"] = torch.linalg.svdvals(W_in_proj).cpu().tolist()
+
+            if layer.self_attn.out_proj.weight is not None:
+                W_out_proj = layer.self_attn.out_proj.weight.detach()
+                spectra["attn_out_proj"] = torch.linalg.svdvals(W_out_proj).cpu().tolist()
+
+            spectra["ff_1"] = torch.linalg.svdvals(layer.linear1.weight.detach()).cpu().tolist()
+            spectra["ff_2"] = torch.linalg.svdvals(layer.linear2.weight.detach()).cpu().tolist()
+
+        return spectra
+
 
 GrokkingTransformer = ModularArithmeticTransformer
 

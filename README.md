@@ -19,6 +19,22 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 
 ## Quick start
 
+### Automated Experiment Runner
+We provide a unified, parallel execution engine driven by YAML configurations to conduct grid searches over model collapse severities, dataset compositions, and random seeds.
+
+```bash
+# 1. Create a config (e.g., experiments.yaml)
+# 2. Run the experiments
+export PYTHONPATH=$(pwd)
+python src/grokking/run_experiments.py --config experiments.yaml --parallel --workers 4
+
+# 3. Aggregate results and plot charts
+python src/grokking/aggregate_results.py --output-dir results --summary-file summary.csv
+```
+See `REPRODUCIBILITY.md` for full parameter settings and expected outputs.
+
+### CLI Workflow
+
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate

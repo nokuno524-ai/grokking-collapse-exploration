@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
 import os
+import random
+import numpy as np
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List
@@ -110,6 +112,11 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     return total_loss / total, correct / total
 
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
 def train(config: TrainConfig) -> TrainState:
     """Run a single training experiment."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -119,6 +126,8 @@ def train(config: TrainConfig) -> TrainState:
     # Set seeds
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
+    np.random.seed(config.seed)
+    random.seed(config.seed)
 
     # Generate data
     data_config = DatasetConfig(
@@ -139,8 +148,9 @@ def train(config: TrainConfig) -> TrainState:
     train_loader = DataLoader(
         train_dataset, batch_size=config.batch_size, shuffle=True,
         generator=loader_generator,
+        worker_init_fn=seed_worker,
     )
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, worker_init_fn=seed_worker)
     
     # Create model
     model = ModularArithmeticTransformer(
@@ -206,6 +216,14 @@ def train(config: TrainConfig) -> TrainState:
             state.embedding_rank = model.get_embedding_rank()
             state.fourier_concentration = compute_fourier_concentration(model)
             
+            # Capture attention snapshot (using first batch) and SVD spectra
+            model.eval()
+            with torch.no_grad():
+                # take a small fixed slice to keep JSON small
+                sample_inputs = inputs[:4] if inputs.shape[0] >= 4 else inputs
+                attention_snapshot = model.get_attention_snapshots(sample_inputs).cpu().tolist()
+                svd_spectra = model.get_svd_spectra()
+
             # Detect grokking
             if test_acc >= state.grokking_threshold and not state.grokked:
                 state.grokked = True
@@ -222,6 +240,8 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "attention_snapshot": attention_snapshot,
+                "svd_spectra": svd_spectra,
             }
             state.history.append(entry)
             

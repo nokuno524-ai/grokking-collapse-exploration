@@ -125,6 +125,30 @@ class ModularArithmeticTransformer(nn.Module):
         entropy = -(s * torch.log(s + 1e-10)).sum()
         return torch.exp(entropy).item()
 
+    def get_attention_snapshots(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Extract attention weights for the given input.
+        Returns tensor of shape (batch, n_heads, seq_len, seq_len)
+        """
+        batch_size = x.shape[0]
+        tok = self.token_embed(x)
+        positions = torch.arange(2, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        pos = self.pos_embed(positions)
+        h = tok + pos
+
+        # Manually extract attention since nn.TransformerEncoderLayer doesn't easily expose it
+        # The layer is self.transformer.layers[0]
+        layer = self.transformer.layers[0]
+
+        # Self attention: Q, K, V are all h
+        # need_weights=True returns (attn_output, attn_weights)
+        _, attn_weights = layer.self_attn(
+            h, h, h,
+            need_weights=True,
+            average_attn_weights=False  # Keep separate heads
+        )
+        return attn_weights.detach()
+
 
 GrokkingTransformer = ModularArithmeticTransformer
 

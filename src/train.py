@@ -17,10 +17,24 @@ try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
     from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .collapse_metrics import (
+        representation_collapse_score,
+        gradient_collapse_score,
+        output_diversity_index,
+        weight_matrix_conditioning,
+        attention_pattern_collapse
+    )
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
     from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from collapse_metrics import (
+        representation_collapse_score,
+        gradient_collapse_score,
+        output_diversity_index,
+        weight_matrix_conditioning,
+        attention_pattern_collapse
+    )
 
 
 @dataclass
@@ -206,6 +220,47 @@ def train(config: TrainConfig) -> TrainState:
             state.embedding_rank = model.get_embedding_rank()
             state.fourier_concentration = compute_fourier_concentration(model)
             
+            # Calculate new collapse metrics
+            with torch.no_grad():
+                # 1. Output diversity index
+                sample_inputs = test_dataset.tensors[0][:100].to(device)
+                sample_logits = model(sample_inputs)
+                diversity_index = output_diversity_index(sample_logits)
+
+                # 2. Representation collapse score (using embeddings for simplicity)
+                # Actually, better to get internal representation, but model doesn't expose it easily.
+                # We'll use the combined token + pos embedding before transformer.
+                tok = model.token_embed(sample_inputs)
+                pos = model.pos_embed(torch.arange(2, device=device).unsqueeze(0).expand(100, -1))
+                h = tok + pos
+                rep_score = representation_collapse_score(h)
+
+                # 3. Weight matrix conditioning (on output head)
+                cond_number = weight_matrix_conditioning(model.output_head.weight)
+
+                # 4. Attention pattern collapse
+                attn_weights = model.get_attention_snapshots(sample_inputs)
+                attn_collapse = attention_pattern_collapse([attn_weights])
+
+            # 5. Gradient collapse score - we need gradients from individual samples
+            # This is expensive, so we just sample a few
+            grad_sim = 0.0
+            if step % (config.eval_every * 10) == 0: # Only do this rarely
+                sample_grads = []
+                for i in range(min(5, len(train_dataset))):
+                    model.zero_grad()
+                    x = train_dataset.tensors[0][i:i+1].to(device)
+                    y = train_dataset.tensors[1][i:i+1].to(device)
+                    out = model(x)
+                    l = F.cross_entropy(out, y)
+                    l.backward()
+
+                    # Flatten all gradients
+                    g_vec = torch.cat([p.grad.flatten() for p in model.parameters() if p.grad is not None])
+                    sample_grads.append(g_vec)
+                grad_sim = gradient_collapse_score(sample_grads)
+                model.zero_grad() # Clean up
+
             # Detect grokking
             if test_acc >= state.grokking_threshold and not state.grokked:
                 state.grokked = True
@@ -222,6 +277,11 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "output_diversity": diversity_index,
+                "representation_collapse": rep_score,
+                "weight_conditioning": cond_number,
+                "attention_collapse": attn_collapse,
+                "gradient_similarity": grad_sim if step % (config.eval_every * 10) == 0 else None,
             }
             state.history.append(entry)
             

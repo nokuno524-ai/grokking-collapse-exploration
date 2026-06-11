@@ -82,3 +82,33 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## New Analysis Scripts (Attention, Circuits, and Weight Dynamics)
+
+We have recently added a comprehensive suite of mechanistic interpretability and statistical tools to deeply analyze how and why grokking happens across normal and collapsed conditions.
+
+### Statistical Rigor (`src/stats_utils.py`)
+Provides essential statistical tools used across analyses:
+- **Bootstrap Confidence Intervals**: `bootstrap_ci`
+- **Cohen's d**: `cohens_d`
+- **Bonferroni Correction**: `bonferroni_correction`
+- **Phase Transition Detection**: `detect_phase_transition`
+
+### Attention Pattern Deep Analysis (`src/attention_viz.py`)
+- **Head Specialization**: Track which attention heads specialize in attending to specific positional embeddings over training.
+- **Attention Head Diversity**: Calculates cosine similarity among attention matrices.
+- **Head Ablation**: Provides `ablate_attention_head` to test the robustness of attention heads on final task accuracy.
+- **Animation**: `animate_attention_evolution` generates animated GIFs visualizing how attention matrices evolve from random initialization into structured, grokked circuits.
+
+### Circuit Discovery (`src/circuit_discovery.py`)
+- **Activation Patching**: Swap intermediate activations between a clean and corrupted pass to identify causal drivers of accurate predictions (`activation_patching`, `trace_information_flow`).
+- **Minimal Grokking Circuits**: Employs a greedy ablation technique (`find_minimal_grokking_circuit`) to prune non-essential heads and identify the minimal required structure for delayed generalization.
+
+### Weight Analysis (`src/weight_analysis.py`)
+- **Norm Distribution**: `track_weight_norm_distribution` dynamically monitors layer-wise L2 norm growth.
+- **SVD Spectrum**: Extracts singular value metrics (like Effective Rank using Shannon Entropy) over training (`get_svd_spectrum`, `analyze_weight_trajectory`).
+- **Phase Correlations**: Associates these detected phase transitions (sudden drops in effective rank or weight norms) with the exact grokking step (`correlate_weight_grokking`).
+
+### Testing and Contributing
+- **Tests**: Located in `tests/`, utilizing `pytest` to guarantee correctness on simulated checkpoints and small test models.
+- **Contributing**: Please review the new `CONTRIBUTING.md` on instructions to add experiments and adhere to statistical standards.

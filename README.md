@@ -47,6 +47,16 @@ python src/transplant_rescue.py \
 - Default optimizer: AdamW, lr=1e-3, wd=1.0, batch=512, 50000 steps.
 - Default task: `(a+b) mod 59` with 30% train fraction.
 
+## Visualizations
+
+The `visualizations/` directory includes publication-ready plotting and animation scripts:
+- **`plot_training_curves.py`**: Compares test accuracy, loss, and weight norm across collapse levels.
+- **`plot_phase_diagram.py`**: Visualizes the transition phase space showing how collapse severity degrades grokking likelihood.
+- **`plot_attention_heatmaps.py`**: Visualizes transformer attention diversity between grokking and collapsed models.
+- **`animate_training.py`**: Generates animations (`.mp4`/`.gif`) of metric evolution over training steps.
+
+See `visualizations/README.md` for specific usage instructions.
+
 ## Repository layout
 
 ```

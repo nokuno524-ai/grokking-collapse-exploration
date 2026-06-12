@@ -117,8 +117,14 @@ def train(config: TrainConfig) -> TrainState:
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
     
     # Set seeds
+    import numpy as np
+    import random
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
+    np.random.seed(config.seed)
+    random.seed(config.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Generate data
     data_config = DatasetConfig(
@@ -136,11 +142,20 @@ def train(config: TrainConfig) -> TrainState:
 
     loader_generator = torch.Generator()
     loader_generator.manual_seed(config.seed)
+
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+
     train_loader = DataLoader(
         train_dataset, batch_size=config.batch_size, shuffle=True,
-        generator=loader_generator,
+        generator=loader_generator, worker_init_fn=seed_worker,
     )
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+    test_loader = DataLoader(
+        test_dataset, batch_size=config.batch_size, shuffle=False,
+        worker_init_fn=seed_worker,
+    )
     
     # Create model
     model = ModularArithmeticTransformer(
@@ -269,7 +284,7 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> dict:
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}

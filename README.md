@@ -82,3 +82,10 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Analysis (New Tools)
+Recent updates add tools to study the mathematical structure underlying grokking:
+- **Fourier Analysis**: Detects circular convolution structures in the embedding matrix (`src/fourier_analysis.py`). Use this to extract and track dominant frequencies during training, proving that the model "discovers" modular arithmetic.
+- **Composition Analysis**: Measures how individual attention heads construct circuits (Q/K/V composition scores) analogous to Anthropic's Mathematical Framework for Transformer Circuits (`src/composition.py`).
+- **Gradient Analysis**: Analyzes gradient noise scales (variance vs bias via SGLD principles) and layer-wise gradient flow to understand training dynamics leading to sudden generalization (`src/gradient_analysis.py`).
+- **Experiment Runner**: Run these analyses systematically across all your checkpoints via `scripts/run_fourier_analysis.py`.

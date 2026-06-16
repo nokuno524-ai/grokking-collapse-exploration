@@ -148,7 +148,10 @@ def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
             raise FileNotFoundError(f"no checkpoint_{step}.pt in {run_dir}")
     else:
         chosen = ckpts[-1]
-    ckpt = torch.load(chosen, map_location="cpu", weights_only=False)
+    try:
+        ckpt = torch.load(chosen, map_location="cpu", weights_only=True)
+    except Exception:
+        ckpt = torch.load(chosen, map_location="cpu", weights_only=False)
     if isinstance(ckpt, dict) and "model_state" in ckpt:
         sd = ckpt["model_state"]
         cfg = ckpt.get("config", {})

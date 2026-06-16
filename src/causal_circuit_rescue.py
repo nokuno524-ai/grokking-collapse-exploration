@@ -146,7 +146,10 @@ def analyze_run(run_dir: Path) -> Dict:
           f"steps {ckpts[0][0]}..{ckpts[-1][0]}")
     series: Dict[int, List[MatrixRankPoint]] = {}
     for step, path in ckpts:
-        ckpt = torch.load(path, map_location="cpu", weights_only=False)
+        try:
+            ckpt = torch.load(path, map_location="cpu", weights_only=True)
+        except Exception:
+            ckpt = torch.load(path, map_location="cpu", weights_only=False)
         if isinstance(ckpt, dict) and "model_state" in ckpt:
             sd = ckpt["model_state"]
         else:

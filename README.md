@@ -27,6 +27,15 @@ uv pip install torch numpy matplotlib scipy
 # Single training run
 python src/train.py --condition pure --max-steps 50000
 
+# How to Reproduce Results
+# 1. Run all conditions to generate data
+python src/train.py --all --max-steps 50000
+
+# 2. Analyze results and generate plots/tables
+python scripts/analyze_results.py
+
+# 3. Output will be saved in analysis/ (CSV summaries, LaTeX tables, plots)
+
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
 

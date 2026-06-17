@@ -17,6 +17,16 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Subliminal Learning & Model Collapse (New Investigation)
+
+Inspired by recent frontier interpretability research (Cloud, arXiv:2507.14805) demonstrating subliminal trait transfer, we are expanding our investigation to analyze how **subliminal learning interacts with model collapse**. Specifically, if collapsed representations lose fine-grained discriminative power, does model collapse amplify subliminal trait transfer?
+
+This expands the grokking/collapse interplay:
+1. **Subliminal Detection:** Tools to test trait transmission (`analysis/subliminal_detection.py`).
+2. **Collapse Amplification:** Experiments comparing subliminal transfer across collapse severities (`experiments/collapse_subliminal.py`).
+3. **Persona Persistence:** Tracking SAE and persona features under collapse conditions (`analysis/persona_persistence.py`).
+4. **Filtering Evaluation:** Testing whether semantic content filtering fails under collapse (`experiments/filtering_eval.py`).
+
 ## Quick start
 
 ```bash

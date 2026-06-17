@@ -82,3 +82,12 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Analysis & Curriculum Interventions
+
+Recent additions provide tools to investigate *why* collapse prevents grokking:
+
+- **SAE Feature Tracking** (`src/analysis/sae_grokking.py`): Sparse Autoencoders trained on intermediate representations map out feature emergence during grokking.
+- **Attention Evolution** (`src/analysis/attention_evolution.py`): Tracks attention entropy and pattern stability across grokking phases to see what the model stops attending to.
+- **SVD Spectrum Analysis** (`src/analysis/svd_analysis.py`): Extracts and analyzes effective rank collapse across different model parameter matrices.
+- **Curriculum Interventions** (`experiments/curriculum_grokking.py`): Manipulates the data ordering strategy (e.g. easy-to-hard or balanced) to observe the shifting dynamics of the grokking threshold.

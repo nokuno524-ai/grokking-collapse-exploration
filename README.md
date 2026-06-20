@@ -50,6 +50,12 @@ python src/transplant_rescue.py \
 ## Repository layout
 
 ```
+analysis/
+  induction_heads.py       # induction head formation tracking
+  circuit_complexity.py    # circuit density and attribution tracing
+  neuron_analysis.py       # polysemanticity / sparsity metrics
+  info_flow.py             # representation-to-target mutual info proxies
+
 src/
   train.py                 # core training loop
   data.py                  # dataset generation + collapse + label noise
@@ -72,6 +78,8 @@ slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
+
+*See [MECHANISTIC_ANALYSIS.md](MECHANISTIC_ANALYSIS.md) for details on the interpretation techniques employed to study circuit formation and failure.*
 
 ## References
 

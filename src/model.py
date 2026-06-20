@@ -110,13 +110,55 @@ class ModularArithmeticTransformer(nn.Module):
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
-        Returns the magnitude of the DFT of each embedding dimension.
+        Returns the squared magnitude (energy) of the DFT of each embedding dimension.
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
         # DFT along the token dimension
-        spectrum = torch.fft.fft(W, dim=0).abs()
+        spectrum = torch.fft.fft(W, dim=0).abs() ** 2
         return spectrum
     
+    def get_attention_snapshots(self, x: torch.Tensor) -> list[torch.Tensor]:
+        """
+        Extract attention snapshots for all layers using the exact inputs.
+
+        Args:
+            x: Input tensor of shape (batch, 2)
+        Returns:
+            List of attention weight tensors of shape (batch, n_heads, seq, seq).
+        """
+        batch_size = x.shape[0]
+        tok = self.token_embed(x)
+        positions = torch.arange(2, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        pos = self.pos_embed(positions)
+        h = tok + pos
+
+        snapshots = []
+        for layer in self.transformer.layers:
+            # self_attn expects query, key, value
+            attn_output, attn_weights = layer.self_attn(
+                h, h, h, need_weights=True, average_attn_weights=False
+            )
+            snapshots.append(attn_weights.detach())
+            h = layer(h)
+
+        return snapshots
+
+    def get_svd_spectra(self) -> dict[str, torch.Tensor]:
+        """
+        Extract singular values for all linear/embedding weight matrices in the model.
+        Returns a dictionary mapping weight names to their singular value spectra.
+        """
+        spectra = {}
+        for name, param in self.named_parameters():
+            if 'weight' in name and param.dim() >= 2:
+                # Calculate SVD for 2D+ weights
+                with torch.no_grad():
+                    # If it's a 1D tensor like layer norm weight, skip
+                    if param.dim() == 2:
+                        s = torch.linalg.svdvals(param.detach())
+                        spectra[name] = s
+        return spectra
+
     def get_embedding_rank(self) -> float:
         """Compute effective rank of the embedding matrix."""
         W = self.token_embed.weight.detach()

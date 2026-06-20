@@ -73,6 +73,14 @@ analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
 
+## Analysis Tools
+The `analysis/` directory contains tools specifically designed to track the mechanistic emergence of generalization and the causes of model collapse:
+- **`attention_evolution.py`**: Tracks attention entropy and generates head specialization heatmaps over time.
+- **`weight_space.py`**: Analyzes the effective rank, weight norms, and geometric alignment (CKA) across different checkpoints.
+- **`grokking_detector.py`**: Automatically detects the exact grokking phase transition step using second-derivative analysis of the test accuracy curve.
+
+For more details, see `ANALYSIS.md`.
+
 ## References
 
 - Power et al. (2022), *Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets*.

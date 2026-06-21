@@ -12,6 +12,9 @@ import math
 class ModularArithmeticTransformer(nn.Module):
     """
     1-layer transformer for modular arithmetic (a + b) mod p.
+    This model serves as the core architecture for grokking vs model collapse
+    experiments, demonstrating how synthetic data contamination prevents delayed
+    generalization.
     
     Architecture:
     - Token embedding: map each integer to a d_model-dimensional vector
@@ -110,11 +113,12 @@ class ModularArithmeticTransformer(nn.Module):
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
-        Returns the magnitude of the DFT of each embedding dimension.
+        Returns the squared magnitude (energy) of the DFT of each embedding dimension,
+        which reveals the presence of periodic structure learned during grokking.
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
         # DFT along the token dimension
-        spectrum = torch.fft.fft(W, dim=0).abs()
+        spectrum = torch.fft.fft(W, dim=0).abs() ** 2
         return spectrum
     
     def get_embedding_rank(self) -> float:

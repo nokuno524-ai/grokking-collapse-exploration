@@ -1,10 +1,15 @@
 """
 Training loop with grokking detection and progress measures.
+Orchestrates the training of the ModularArithmeticTransformer, tracking metrics
+such as test accuracy, weight norm, effective embedding rank, and Fourier concentration
+to identify phase transitions indicative of grokking.
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import random
+import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
@@ -100,9 +105,12 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            loss = F.cross_entropy(logits, targets)
-            total_loss += loss.item() * inputs.shape[0]
+            # Use AMP for precision issues during forward pass evaluations if available
+            with torch.autocast(device_type=device.type if device.type != 'mps' else 'cpu', enabled=device.type=='cuda'):
+                logits = model(inputs)
+                loss = F.cross_entropy(logits, targets)
+            # Use float64 precision for loss accumulation
+            total_loss += float(loss.item()) * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
@@ -111,12 +119,18 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment tracking the interplay of grokking and collapse.
+    The loop logs periodic metrics (loss, accuracy, Fourier concentration) into a
+    results JSON history to allow mechanistic analysis later.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
     
     # Set seeds
+    random.seed(config.seed)
+    np.random.seed(config.seed)
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
 
@@ -181,13 +195,16 @@ def train(config: TrainConfig) -> TrainState:
         
         inputs, targets = inputs.to(device), targets.to(device)
         
-        # Forward
-        logits = model(inputs)
-        loss = F.cross_entropy(logits, targets)
+        # Forward with autocast for precision stability
+        with torch.autocast(device_type=device.type if device.type != 'mps' else 'cpu', enabled=device.type=='cuda'):
+            logits = model(inputs)
+            loss = F.cross_entropy(logits, targets)
         
         # Backward
         optimizer.zero_grad()
         loss.backward()
+        # Gradient clipping to handle exploding gradients during early collapse phases
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         
         state.step = step

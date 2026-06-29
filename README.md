@@ -38,7 +38,16 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Run phase transition grid experiments
+export PYTHONPATH=$(pwd)
+python experiments/phase_transitions.py --collapse-levels 0.0,0.15,0.30 --label-noises 0.0,0.15,0.30
+
+# Launch interactive visualization dashboard
+streamlit run visualizations/interactive_dashboard.py
 ```
+
+See `EXPERIMENTS.md` for a full breakdown of the phase transition grid, statistical significance testing, and publication figures generation.
 
 ## Architecture
 

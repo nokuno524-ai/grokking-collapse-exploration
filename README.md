@@ -22,10 +22,13 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install torch numpy matplotlib scipy scikit-learn
 
 # Single training run
 python src/train.py --condition pure --max-steps 50000
+
+# Run Mechanistic Analysis and Interpretability Tools on checkpoints
+python -c "from src.model import ModularArithmeticTransformer; from analysis.weight_analysis import WeightAnalysisSuite; suite = WeightAnalysisSuite.load_from_checkpoint_dir(ModularArithmeticTransformer(), 'results/exp_c_grid/wd1/noise0/seed_42', step=1000)"
 
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
@@ -82,3 +85,4 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+- ICML (2026), *Functional Welfare Axis and Attention-Head Stability in LLMs*.

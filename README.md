@@ -82,3 +82,24 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Analysis Tools
+We have implemented new tools to analyze the results of the experiments:
+
+1. **Results Analyzer**
+```bash
+python analysis/analyze_results.py
+```
+This tool loads all experiment results, generates summary statistics, creates comparison plots (accuracy curves, weight norm trajectories), performs statistical significance testing, and outputs a formatted Markdown report (`results/ANALYSIS.md`).
+
+2. **Phase Transition Detector**
+```bash
+python analysis/phase_transition.py
+```
+Detects grokking signatures, acceleration/deceleration in learning curves, and correlates phase transitions with weight norm changes.
+
+3. **Attention Visualizer**
+```bash
+python viz/attention_evolution.py
+```
+Provides functions to load model checkpoints, extract attention weights, compute attention entropy, and visualize attention heatmaps to study the shift in attention patterns.

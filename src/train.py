@@ -13,6 +13,9 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
+
 try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
@@ -77,6 +80,13 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     """
     Measure how concentrated the Fourier spectrum is on the top-k frequencies.
     High concentration → grokking has occurred (or is occurring).
+
+    Args:
+        model (ModularArithmeticTransformer): The model whose embedding to analyze.
+        top_k (int): Number of top frequencies to measure concentration against.
+
+    Returns:
+        float: The ratio of energy in the top-k frequencies relative to the total energy.
     """
     spectrum = model.get_embedding_fourier_spectrum()  # (prime, d_model)
     # Average across embedding dimensions
@@ -90,8 +100,34 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
+def load_checkpoint(ckpt_path: str) -> dict:
+    """
+    Load a PyTorch checkpoint robustly with fallback for older versions.
+
+    Args:
+        ckpt_path (str): Filepath to the PyTorch checkpoint.
+
+    Returns:
+        dict: The loaded checkpoint dictionary containing state_dict and configs.
+    """
+    try:
+        return torch.load(ckpt_path, map_location="cpu", weights_only=True)
+    except Exception as e:
+        print(f"Failed to load with weights_only=True: {e}. Falling back to weights_only=False.")
+        return torch.load(ckpt_path, map_location="cpu", weights_only=False)
+
 def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+    """
+    Evaluate model, return (loss, accuracy).
+
+    Args:
+        model (nn.Module): The PyTorch model to evaluate.
+        dataloader (DataLoader): PyTorch DataLoader providing the evaluation batches.
+        device (torch.device): Device to perform evaluation on.
+
+    Returns:
+        tuple: (average_loss, average_accuracy) across all batches.
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -100,9 +136,10 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            loss = F.cross_entropy(logits, targets)
-            total_loss += loss.item() * inputs.shape[0]
+            with torch.autocast(device_type=device.type):
+                logits = model(inputs)
+                loss = F.cross_entropy(logits, targets)
+            total_loss += float(loss.item()) * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
@@ -111,7 +148,15 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment loop, evaluating and tracking metrics periodically.
+
+    Args:
+        config (TrainConfig): Training configuration parameters.
+
+    Returns:
+        TrainState: Object containing the final tracked state and history.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
@@ -270,7 +315,16 @@ def train(config: TrainConfig) -> TrainState:
 
 
 def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
-    """Run all experimental conditions."""
+    """
+    Run all predefined experimental conditions for collapse severity mapping.
+
+    Args:
+        output_dir (str): Directory to save outputs to.
+        max_steps (int): Maximum training steps per condition.
+
+    Returns:
+        dict: A dictionary of results summary per condition.
+    """
     conditions = get_all_conditions()
     results = {}
     
@@ -307,40 +361,34 @@ def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
     return results
 
 
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig):
+    # Convert hydra config to our TrainConfig dataclass
+    config = TrainConfig(
+        prime=cfg.prime,
+        d_model=cfg.d_model,
+        n_heads=cfg.n_heads,
+        d_ff=cfg.d_ff,
+        n_layers=cfg.n_layers,
+        max_steps=cfg.max_steps,
+        lr=cfg.lr,
+        weight_decay=cfg.weight_decay,
+        batch_size=cfg.batch_size,
+        eval_every=cfg.eval_every,
+        log_every=cfg.log_every,
+        save_every=cfg.save_every,
+        collapse_level=cfg.collapse_level,
+        collapse_severity=cfg.collapse_severity,
+        train_fraction=cfg.train_fraction,
+        noise_fraction=cfg.noise_fraction,
+        seed=cfg.seed,
+        output_dir=cfg.output_dir,
+        condition_name=cfg.condition_name,
+    )
+    # Check if a meta-condition was requested via run_all config logic
+    # Here we simplify, letting the user pass override pairs
+    # e.g., python src/train.py collapse_level=0.15 condition_name=medium_collapse
+    train(config)
+
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--condition", type=str, default=None,
-                       help="Run specific condition (pure/low/medium/high/severe)")
-    parser.add_argument("--all", action="store_true", help="Run all conditions")
-    parser.add_argument("--max-steps", type=int, default=50000)
-    parser.add_argument("--output-dir", type=str, default="results")
-    args = parser.parse_args()
-    
-    if args.all:
-        run_all_conditions(args.output_dir, args.max_steps)
-    elif args.condition:
-        conditions = get_all_conditions()
-        # Match partial names
-        matched = None
-        for name, config in conditions.items():
-            if args.condition.lower() in name:
-                matched = name
-                break
-        if matched:
-            config = conditions[matched]
-            train_config = TrainConfig(
-                collapse_level=config.collapse_level,
-                collapse_severity=config.collapse_severity,
-                condition_name=matched,
-                output_dir=args.output_dir,
-                max_steps=args.max_steps,
-            )
-            train(train_config)
-        else:
-            print(f"Unknown condition: {args.condition}")
-            print(f"Available: {list(conditions.keys())}")
-    else:
-        # Default: run pure condition
-        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
-        train(train_config)
+    main()

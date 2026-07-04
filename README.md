@@ -17,6 +17,49 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Setup and Reproduction
+
+All dependencies are managed securely via `uv`.
+
+```bash
+# Install environment
+uv venv .venv && source .venv/bin/activate
+uv pip install -r requirements.txt
+# Alternatively, if you need the interactive tools:
+uv pip install torch numpy matplotlib scipy pandas seaborn scikit-learn pytest hydra-core
+
+# Run the test suite to ensure correctness
+export PYTHONPATH=$(pwd)
+pytest tests/
+```
+
+We now use Hydra for configuration management, meaning you can easily override parameters from the command line. By default, hydra outputs to a date-based directory, but you can override this:
+```bash
+# Single training run with default settings
+python src/train.py hydra.run.dir=results/pure condition_name=pure
+
+# Override collapse level and run specific condition
+python src/train.py hydra.run.dir=results/medium_collapse collapse_level=0.15 condition_name=medium_collapse
+```
+
+## Key Findings & Analysis
+Based on the experiments and audit logs, we've found that:
+1. **Scarcity Dissociation**: The model can grok effectively on 50% training data with a higher Fourier concentration than on the full dataset, yet it fails entirely when given 15% corrupted data. This indicates that model collapse contamination is not simply "sample size shrinkage."
+2. **Sharp Noise Cliff**: A phase transition exists around a 10-15% label-noise rate, where generalization ability suddenly plummets.
+3. **Weight Decay Role**: Weight decay (e.g. `wd=1.0`) is a crucial hyperparameter that can slightly shift this noise cliff, whereas excessive weight decay (`wd=3.0`) prevents grokking altogether.
+4. **Indistinguishable Distributions**: Collapse contamination is statistically indistinguishable from a matched uniform noise rate on final test accuracy distributions.
+
+## Post-Run Analysis
+The repository includes several analysis tools to generate publication-quality figures:
+- **Attention Evolution:** `python visualizations/attention_evolution.py`
+- **Weight Norm Trajectories:** `python visualizations/weight_norm_trajectory.py`
+- **Loss Landscape PCA:** `python visualizations/loss_landscape_pca.py`
+- **Grokking Onset Detection:** `python visualizations/grokking_onset.py`
+- **Multi-panel Summary:** `python visualizations/multi_panel_summary.py`
+- **Summary Text Report:** `python analysis/summary_report.py`
+
+Figures will be saved as PDFs/PNGs in the `visualizations/` directory.
+
 ## Quick start
 
 ```bash

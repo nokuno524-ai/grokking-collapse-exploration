@@ -97,7 +97,7 @@ def apply_collapse(
     temp = max(0.1, 1.0 - collapse_severity)
     collapsed_probs = {}
     for t in range(prime):
-        base_prob = freq.get(t, 1.0 / prime)
+        base_prob = freq.get(t, 1e-10)
         collapsed_probs[t] = base_prob ** (1.0 / temp)
     
     # Normalize

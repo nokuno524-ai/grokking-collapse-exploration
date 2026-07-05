@@ -100,9 +100,10 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            loss = F.cross_entropy(logits, targets)
-            total_loss += loss.item() * inputs.shape[0]
+            with torch.autocast(device_type=device.type if device.type != 'mps' else 'cpu', enabled=device.type != 'cpu'):
+                logits = model(inputs)
+                loss = F.cross_entropy(logits, targets)
+            total_loss += float(loss.item()) * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
@@ -182,8 +183,9 @@ def train(config: TrainConfig) -> TrainState:
         inputs, targets = inputs.to(device), targets.to(device)
         
         # Forward
-        logits = model(inputs)
-        loss = F.cross_entropy(logits, targets)
+        with torch.autocast(device_type=device.type if device.type != 'mps' else 'cpu', enabled=device.type != 'cpu'):
+            logits = model(inputs)
+            loss = F.cross_entropy(logits, targets)
         
         # Backward
         optimizer.zero_grad()
@@ -307,40 +309,35 @@ def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
     return results
 
 
-if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--condition", type=str, default=None,
-                       help="Run specific condition (pure/low/medium/high/severe)")
-    parser.add_argument("--all", action="store_true", help="Run all conditions")
-    parser.add_argument("--max-steps", type=int, default=50000)
-    parser.add_argument("--output-dir", type=str, default="results")
-    args = parser.parse_args()
+import hydra
+from omegaconf import DictConfig
+
+@hydra.main(version_base=None, config_path="../conf", config_name="config")
+def main(cfg: DictConfig):
+    # Convert DictConfig to TrainConfig
+    train_config = TrainConfig(
+        prime=cfg.prime,
+        d_model=cfg.d_model,
+        n_heads=cfg.n_heads,
+        d_ff=cfg.d_ff,
+        n_layers=cfg.n_layers,
+        max_steps=cfg.max_steps,
+        lr=cfg.lr,
+        weight_decay=cfg.weight_decay,
+        batch_size=cfg.batch_size,
+        eval_every=cfg.eval_every,
+        log_every=cfg.log_every,
+        save_every=cfg.save_every,
+        collapse_level=cfg.collapse_level,
+        collapse_severity=cfg.collapse_severity,
+        train_fraction=cfg.train_fraction,
+        noise_fraction=cfg.noise_fraction,
+        seed=cfg.seed,
+        output_dir=cfg.output_dir,
+        condition_name=cfg.condition_name,
+    )
     
-    if args.all:
-        run_all_conditions(args.output_dir, args.max_steps)
-    elif args.condition:
-        conditions = get_all_conditions()
-        # Match partial names
-        matched = None
-        for name, config in conditions.items():
-            if args.condition.lower() in name:
-                matched = name
-                break
-        if matched:
-            config = conditions[matched]
-            train_config = TrainConfig(
-                collapse_level=config.collapse_level,
-                collapse_severity=config.collapse_severity,
-                condition_name=matched,
-                output_dir=args.output_dir,
-                max_steps=args.max_steps,
-            )
-            train(train_config)
-        else:
-            print(f"Unknown condition: {args.condition}")
-            print(f"Available: {list(conditions.keys())}")
-    else:
-        # Default: run pure condition
-        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
-        train(train_config)
+    train(train_config)
+
+if __name__ == "__main__":
+    main()

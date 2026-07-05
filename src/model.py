@@ -104,21 +104,35 @@ class ModularArithmeticTransformer(nn.Module):
         return logits
     
     def get_weight_norm(self) -> float:
-        """Get total L2 norm of all parameters."""
+        """
+        Get total L2 norm of all parameters.
+
+        Returns:
+            float: Total L2 norm.
+        """
         return sum(p.norm().item() ** 2 for p in self.parameters()) ** 0.5
     
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
-        Returns the magnitude of the DFT of each embedding dimension.
+        Returns the squared magnitude (energy) of the DFT of each embedding dimension.
+
+        Returns:
+            torch.Tensor: Energy of the DFT of shape (prime, d_model).
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
-        # DFT along the token dimension
-        spectrum = torch.fft.fft(W, dim=0).abs()
+        # DFT along the token dimension (use energy .abs() ** 2 per memory)
+        spectrum = torch.fft.fft(W, dim=0).abs() ** 2
         return spectrum
     
     def get_embedding_rank(self) -> float:
-        """Compute effective rank of the embedding matrix."""
+        """
+        Compute effective rank of the embedding matrix.
+        Calculated as the exponential of the Shannon entropy of normalized singular values.
+
+        Returns:
+            float: Effective rank.
+        """
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
         s = s / s.sum()

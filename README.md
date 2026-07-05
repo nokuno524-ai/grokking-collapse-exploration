@@ -19,25 +19,18 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 
 ## Quick start
 
+We have implemented a comprehensive experiment runner and Hydra configuration for reproducing our primary results. See `REPRODUCE.md` for full instructions.
+
 ```bash
-# Install (uv + venv, NOT conda — we are on Rivanna)
+# Install dependencies using uv
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install -r requirements.txt
 
-# Single training run
-python src/train.py --condition pure --max-steps 50000
+# Run all experiment conditions and generate dashboard
+./run_all.sh
 
-# Reproduce the wd × noise grid (SLURM array, 90 jobs)
-sbatch slurm/exp_c_grid.sbatch
-
-# Reproduce the noise / scarcity / multi-seed baselines
-sbatch slurm/baselines.sh
-
-# Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
-    --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
-    --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
-    --output-dir analysis/transplant
+# Single training run via Hydra configuration
+python src/train.py condition_name=pure max_steps=50000
 ```
 
 ## Architecture
@@ -82,3 +75,27 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Parameter Descriptions
+
+- `prime`: Modulus used for modular arithmetic (default: 59).
+- `d_model`: Dimensionality of the model and embeddings (default: 128).
+- `n_heads`: Number of attention heads (default: 4).
+- `d_ff`: Feedforward network dimension (default: 512).
+- `n_layers`: Number of transformer encoder layers (default: 1).
+- `max_steps`: Total training steps (default: 50,000).
+- `lr`: Learning rate for AdamW optimizer (default: 1e-3).
+- `weight_decay`: Weight decay strength, critical for grokking (default: 1.0).
+- `batch_size`: Batch size (default: 512).
+- `collapse_level`: Fraction of training data replaced by synthetic outputs [0.0 - 1.0].
+- `collapse_severity`: Temperature/warp level of the synthetic generator [0.0 - 1.0].
+- `train_fraction`: Fraction of total possible data pairs used for training (default: 0.3).
+- `noise_fraction`: Baseline control, fraction of training data replaced with uniform random noise.
+
+
+## Methodology
+The experiments use a 1-layer Transformer trained on modular addition (`(a+b) mod 59`). To simulate model collapse, a synthetic data generator substitutes pure outputs with "collapsed" distributions (controlled by `collapse_level` and `collapse_severity`). A robust grokking detector tracks test accuracy via Savitzky-Golay filtering, and mechanistic tools analyze attention patterns, weight norms, and gradient flows throughout training.
+
+## Key Findings
+1. **Model Collapse Prevents Grokking:** Pure models grok rapidly with 100% test accuracy. However, models trained on severe collapse data fail to grok entirely.
+2. **Weight Norm Correlation:** Weight norm reduction is heavily correlated with collapse severity, indicating that collapse degrades structural representation capability.

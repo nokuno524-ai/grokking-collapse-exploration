@@ -17,6 +17,14 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Visualization
+
+The repository includes a comprehensive visualization suite located in the `visualization/` directory to generate publication-quality figures:
+- **`attention_evolution.py`**: Extracts and analyzes attention patterns, computing entropy/similarity, and plotting heatmaps/animations over the training trajectory. Use to create `.mp4` and `.gif` animations of attention evolution.
+- **`training_dynamics.py`**: Multi-panel plots showing the co-evolution of loss, accuracy, weight norm, L0 sparsity, and Fourier concentration. Automatically detects grokking transitions.
+- **`collapse_landscape.py`**: 3D surface plots and heatmaps showing grokking onset vs. collapse severity and level, along with confidence intervals.
+- **`publication_figures.py`**: Entry point to set publication-ready styling (NeurIPS/ICML standards, 300+ DPI, colorblind-friendly) and generate final PDF/PNG outputs.
+
 ## Quick start
 
 ```bash

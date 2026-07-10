@@ -136,7 +136,7 @@ def _layerwise_hidden_states(
 
 def _effective_rank(matrix: torch.Tensor, n_components: int = 256) -> float:
     """Effective rank: exp(entropy of normalized squared singular values)."""
-    if matrix.numel() == 0:
+    if matrix.numel() == 0 or torch.isnan(matrix).any() or torch.isinf(matrix).any():
         return 0.0
     centered = matrix - matrix.mean(dim=0, keepdim=True)
     k = int(min(n_components, centered.shape[0], centered.shape[1]))
@@ -145,10 +145,12 @@ def _effective_rank(matrix: torch.Tensor, n_components: int = 256) -> float:
     s = torch.linalg.svdvals(centered)[:k]
     s2 = s.pow(2)
     total = s2.sum()
-    if total <= 0:
+    if total <= 1e-12 or torch.isnan(total):
         return 0.0
     p = (s2 / total).clamp_min(1e-12)
     H = -(p * p.log()).sum()
+    if torch.isnan(H) or torch.isinf(H):
+        return 0.0
     return float(torch.exp(H).item())
 
 

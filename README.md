@@ -15,6 +15,16 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.
 
+## Visualizing Results
+
+The `viz/` directory contains comprehensive presentation-ready visualization tools for Phase 1 results. Key outputs include:
+- `viz/results_dashboard.png`: Multi-panel plot comparing accuracy, weight norms, loss landscape, and grokking onset steps across all collapse conditions.
+- `viz/attention_evolution.gif`: Animation comparing attention weight evolution between pure and severe collapse conditions.
+- `viz/fourier_analysis.png`: Fourier basis representation and concentration trajectories.
+- `viz/statistical_report.md`: Statistical comparisons (KS test, KL divergence) of weight and embedding distributions.
+
+See `viz/README.md` for instructions on regenerating these assets.
+
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
 ## Quick start

@@ -132,9 +132,11 @@ def attention_weight_rank(model: torch.nn.Module) -> float:
     Equals 1 if rank-1, scales up as energy spreads across more directions.
     """
     W = _last_attention_weight(model).float()
+    if W.numel() == 0 or torch.isnan(W).any() or torch.isinf(W).any():
+        return 0.0
     s = torch.linalg.svdvals(W)
     s2 = s.pow(2)
-    if s2.numel() == 0 or s2.max() <= 0:
+    if s2.numel() == 0 or s2.max() <= 1e-12 or torch.isnan(s2).any():
         return 0.0
     return float((s2.sum() / s2.max()).item())
 
@@ -197,7 +199,24 @@ def directional_concentration(
         idx_b[same] = (idx_b[same] + 1) % n
     a = flat[idx_a]
     b = flat[idx_b]
+
+    # Handle zero norms which would cause NaNs in cosine similarity
+    a_norm = a.norm(dim=-1, keepdim=True)
+    b_norm = b.norm(dim=-1, keepdim=True)
+    a = torch.where(a_norm == 0, torch.zeros_like(a), a)
+    b = torch.where(b_norm == 0, torch.zeros_like(b), b)
+
     cos = F.cosine_similarity(a, b, dim=-1)
+
+    # Filter out NaNs if any persist
+    valid = ~torch.isnan(cos) & ~torch.isinf(cos)
+    if not valid.any():
+        return 0.0, 0.0
+
+    cos = cos[valid]
+    if cos.numel() == 1:
+        return float(cos.mean().item()), 0.0
+
     return float(cos.mean().item()), float(cos.std(unbiased=False).item())
 
 

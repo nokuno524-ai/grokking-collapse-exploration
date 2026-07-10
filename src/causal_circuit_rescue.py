@@ -80,6 +80,8 @@ def list_checkpoints(run_dir: Path) -> List[Tuple[int, Path]]:
 
 
 def effective_rank(s: torch.Tensor) -> float:
+    if s.numel() == 0 or torch.isnan(s).any() or torch.isinf(s).any():
+        return 0.0
     s = s.float().clamp(min=0.0)
     total = s.sum()
     if total <= 1e-12:
@@ -87,6 +89,8 @@ def effective_rank(s: torch.Tensor) -> float:
     p = s / total
     p = p.clamp(min=1e-30)
     entropy = -(p * p.log()).sum()
+    if torch.isnan(entropy) or torch.isinf(entropy):
+        return 0.0
     return float(torch.exp(entropy).item())
 
 

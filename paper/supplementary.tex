@@ -1,0 +1,53 @@
+\documentclass{article}
+
+\usepackage{neurips_2024}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{amsmath}
+
+\title{Supplementary Material: Grokking Cliffs}
+
+\author{
+  Anonymous Authors \\
+}
+
+\begin{document}
+
+\maketitle
+
+\appendix
+
+\section{Extended Experimental Details}
+
+\subsection{Architecture and Training setup}
+We used a 1-layer Transformer encoder with $d_{\text{model}}=128$, 4 heads, and a GELU feed-forward network with $d_{\text{ff}}=512$. This results in roughly 214K parameters. The vocabulary contains tokens $0$ to $p-1$ ($p=59$) and a special equals token. Inputs consist of sequences like `a = b`. Mean-pooling is applied over the two operand positions. The optimizer is AdamW with learning rate $1 \times 10^{-3}$, a batch size of 512, and models were trained for a maximum of 50,000 steps.
+
+\subsection{Data Generation Details}
+The modular arithmetic dataset involves the task $(a + b) \pmod p$ with $p=59$. The full dataset contains $p^2 = 3481$ equations. We used a train fraction of $30\%$, creating a training set of $\sim 1044$ examples.
+For \textbf{Label Noise}, we randomly sampled a fraction $\eta$ of the training labels and replaced them with uniformly random integers in $\{0, \dots, p-1\}$.
+For \textbf{Model Collapse Contamination}, labels are sampled from a "teacher" model. The contamination severity modifies the temperature of the teacher's softmax distribution before sampling.
+
+\section{Hyperparameter Sensitivity Analysis}
+
+We examined the sensitivity to the weight decay parameter ($wd \in \{0.3, 1.0, 3.0\}$). As discussed in the main text, $wd=3.0$ acts as a secondary cliff, preventing the model from achieving a low enough loss on the training data, hence preventing grokking entirely across all noise levels. Between $wd=0.3$ and $wd=1.0$, the exact location of the noise cliff slightly shifts, but the sharp phase transition behavior remains the same.
+
+\section{Additional Figures}
+
+% TODO: Include additional figures showing all seeds and conditions if required.
+\begin{figure}[ht]
+    \centering
+    % \includegraphics[width=\textwidth]{supp_figure1.pdf}
+    \caption{Placeholder for supplementary figure: complete grid sweep over all 5 seeds.}
+    \label{fig:supp_grid}
+\end{figure}
+
+\end{document}

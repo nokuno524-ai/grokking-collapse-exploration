@@ -22,7 +22,11 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install torch numpy matplotlib scipy pandas seaborn scikit-learn tabulate pytest umap-learn
+
+# Run the Unified Reproduction Framework (Analysis, Plots, Statistics)
+# Note: Pass --skip-training if you already have the data
+python reproduce.py
 
 # Single training run
 python src/train.py --condition pure --max-steps 50000
@@ -50,6 +54,7 @@ python src/transplant_rescue.py \
 ## Repository layout
 
 ```
+reproduce.py               # Unified entrypoint to execute analysis/visualizations
 src/
   train.py                 # core training loop
   data.py                  # dataset generation + collapse + label noise
@@ -70,6 +75,13 @@ src/
 
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries
+  analyze_results.py       # script to parse summary stats from results
+  visualizations.py        # plotting logic for trajectories, heatmaps, t-SNE
+  statistics.py            # correlation, CI bootstrap, and MI calculations
+tests/
+  test_analysis.py         # Pytest verification of analysis utilities
+docs/
+  FINDINGS.md              # Long-form writeup of results
 results/                   # results.json + checkpoint_*.pt per run
 ```
 

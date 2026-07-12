@@ -1,0 +1,66 @@
+{
+  "config": {
+    "model": {
+      "layers": 1,
+      "heads": 2,
+      "dim": 64,
+      "d_ff": 128
+    },
+    "data": {
+      "vocabulary_size": 59,
+      "sequence_length": 2,
+      "collapse_ratio": 0.0,
+      "collapse_severity": 0.0,
+      "train_fraction": 0.3,
+      "noise_fraction": 0.0
+    },
+    "training": {
+      "steps": 50,
+      "lr": 0.001,
+      "weight_decay": 1.0,
+      "batch_size": 32,
+      "optimizer": "AdamW",
+      "seed": 42
+    },
+    "evaluation": {
+      "checkpoints": 100,
+      "eval_every": 25,
+      "metrics": [
+        "accuracy",
+        "loss",
+        "weight_norm",
+        "embedding_rank",
+        "fourier_concentration"
+      ]
+    }
+  },
+  "grokked": false,
+  "grokking_step": null,
+  "final_train_acc": 0.06130268199233716,
+  "final_test_acc": 0.008206811653672548,
+  "final_weight_norm": 16.50871407070753,
+  "final_embedding_rank": 48.62333297729492,
+  "final_fourier_concentration": 0.09904402494430542,
+  "history": [
+    {
+      "step": 25,
+      "train_loss": 4.035681952918626,
+      "test_loss": 4.112316156245667,
+      "train_acc": 0.03735632183908046,
+      "test_acc": 0.00943783340172343,
+      "weight_norm": 16.896271685286013,
+      "embedding_rank": 48.525787353515625,
+      "fourier_concentration": 0.09697853028774261
+    },
+    {
+      "step": 50,
+      "train_loss": 3.9954847321199733,
+      "test_loss": 4.128449207160333,
+      "train_acc": 0.06130268199233716,
+      "test_acc": 0.008206811653672548,
+      "weight_norm": 16.50871407070753,
+      "embedding_rank": 48.62333297729492,
+      "fourier_concentration": 0.09904402494430542
+    }
+  ]
+}

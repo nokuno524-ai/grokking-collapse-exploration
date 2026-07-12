@@ -1,0 +1,26 @@
+model:
+  layers: 1
+  heads: 4
+  dim: 128
+  d_ff: 512
+
+data:
+  vocabulary_size: 59
+  sequence_length: 2
+  collapse_ratio: 0.50
+  collapse_severity: 0.9
+  train_fraction: 0.3
+  noise_fraction: 0.0
+
+training:
+  steps: 50000
+  lr: 0.001
+  weight_decay: 1.0
+  batch_size: 512
+  optimizer: "AdamW"
+  seed: 42
+
+evaluation:
+  checkpoints: 5000
+  eval_every: 100
+  metrics: ["accuracy", "loss", "weight_norm", "embedding_rank", "fourier_concentration"]

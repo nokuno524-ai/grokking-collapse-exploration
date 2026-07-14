@@ -17,6 +17,8 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+See `docs/ANALYSIS_TOOLKIT.md` for an overview of newly added analysis tools (Fourier circuits, Attention evolution, J-space probe).
+
 ## Quick start
 
 ```bash

@@ -110,11 +110,11 @@ class ModularArithmeticTransformer(nn.Module):
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
-        Returns the magnitude of the DFT of each embedding dimension.
+        Returns the squared magnitude (energy) of the DFT of each embedding dimension.
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
-        # DFT along the token dimension
-        spectrum = torch.fft.fft(W, dim=0).abs()
+        # DFT along the token dimension (squared magnitude for energy)
+        spectrum = torch.fft.fft(W, dim=0).abs() ** 2
         return spectrum
     
     def get_embedding_rank(self) -> float:

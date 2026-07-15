@@ -4,6 +4,8 @@ A controlled study of how label-noise rate, weight-decay strength, and training-
 
 ## What the data show
 
+Our experiments systematically investigate how model collapse from synthetic data degrades model learning compared to uniform label noise.
+
 After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium real-LM runs:
 
 1. **Sharp grokking cliff in label-noise rate.** With weight decay in {0.3, 1.0}, 5/5 seeds grok at noise ≤ 0.10 and 0/5 seeds grok at noise ≥ 0.15. The transition occupies a single 5-percentage-point band.
@@ -19,13 +21,23 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 
 ## Quick start
 
+To install dependencies and start the virtual environment:
+
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install pyyaml torch numpy matplotlib scipy pandas seaborn pytest plotly
+```
 
-# Single training run
-python src/train.py --condition pure --max-steps 50000
+You can run experiments using the provided YAML configuration files:
+
+```bash
+# Run experiments with YAML configs
+python runner.py --config configs/pure.yaml
+python runner.py --config configs/severe_collapse.yaml
+```
+
+```bash
 
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch

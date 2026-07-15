@@ -24,6 +24,8 @@ class DatasetConfig:
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Generate (a, b) -> (a + b) mod p dataset.
+    This creates the full dataset and splits it into training and test sets.
+    The training set might be contaminated with simulated model collapse or label noise.
     
     Returns:
         train_inputs, train_targets, test_inputs, test_targets
@@ -78,6 +80,10 @@ def apply_collapse(
     """
     Simulate model collapse by replacing some targets with outputs from a "collapsed" model.
     
+    Model collapse is simulated by narrowing the output distribution:
+    - `collapse_level`: Fraction of the dataset to replace with "synthetic" data.
+    - `collapse_severity`: Controls the temperature of the output distribution (higher = more collapsed).
+
     A collapsed model has:
     - Narrowed output distribution (favors common results)
     - Occasional errors (assigns probability mass incorrectly)
@@ -97,7 +103,7 @@ def apply_collapse(
     temp = max(0.1, 1.0 - collapse_severity)
     collapsed_probs = {}
     for t in range(prime):
-        base_prob = freq.get(t, 1.0 / prime)
+        base_prob = freq.get(t, 1e-10)
         collapsed_probs[t] = base_prob ** (1.0 / temp)
     
     # Normalize

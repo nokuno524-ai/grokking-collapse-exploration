@@ -100,9 +100,10 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            loss = F.cross_entropy(logits, targets)
-            total_loss += loss.item() * inputs.shape[0]
+            with torch.autocast(device_type=device.type):
+                logits = model(inputs)
+                loss = F.cross_entropy(logits, targets)
+            total_loss += float(loss.item()) * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
@@ -111,7 +112,16 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment.
+
+    This function sets up the data, model, and optimizer, then runs the training loop.
+    During training, it monitors test accuracy to detect grokking (delayed generalization).
+    The grokking point is defined as the step where test accuracy first surpasses a threshold
+    (default 95%).
+
+    Metrics like Fourier concentration and weight norm are recorded periodically.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")

@@ -22,7 +22,7 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install torch numpy matplotlib scipy pandas seaborn statsmodels scikit-learn
 
 # Single training run
 python src/train.py --condition pure --max-steps 50000
@@ -38,6 +38,13 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Run the attention patterns and grokking statistical analysis pipeline
+python analysis/attention_patterns.py
+python analysis/visualizations.py
+python analysis/attention_statistics.py
+python analysis/generate_report.py
+# View the full results at analysis/report.html
 ```
 
 ## Architecture

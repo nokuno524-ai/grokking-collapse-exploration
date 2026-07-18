@@ -82,3 +82,11 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Findings
+
+A comprehensive mechanistic analysis (`analysis/weights.py`, `analysis/mlp_geometry.py`, `analysis/mechanisms.py`) reveals the following structural differences between pure grokking and model collapse:
+
+1. **Weight Geometry Analysis:** Pure models (which grok) exhibit lower final weight norms (Embed: ~1.59, Attn: ~26.0) compared to collapsed models (Embed: >2.0, Attn: >31.0).
+2. **Effective Rank Evolution:** Collapsed conditions show significantly higher effective rank across both embedding layers and MLP projections, indicating unstructured memorization rather than lower-dimensional generalized circuits.
+3. **Information Flow & MLP Geometry:** Causal patching tools and MLP activation hooks are implemented to further trace the precise sub-networks and polysemantic neuron development distinguishing delayed generalization from label-noise memorization.

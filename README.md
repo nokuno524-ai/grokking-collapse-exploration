@@ -68,9 +68,21 @@ src/
   contamination/           # toy contamination experiment
   contamination_real/      # GPT-2 medium + LoRA on contaminated OWT (Exp B)
 
+metrics/
+  data_quality.py          # Data quality metrics (n-gram, KL div, NCD)
+  collapse_predictor.py    # Sklearn classifier to predict collapse from metrics
+
+data/
+  synthetic.py             # Synthetic generator handling temp/top-k/nucleus
+
+evaluation/
+  framework.py             # Automated pipeline for metrics + prediction reporting
+
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
+docs/
+  DATA_QUALITY.md          # Theoretical relationships of data metrics to collapse
 ```
 
 ## References

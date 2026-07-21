@@ -47,9 +47,26 @@ python src/transplant_rescue.py \
 - Default optimizer: AdamW, lr=1e-3, wd=1.0, batch=512, 50000 steps.
 - Default task: `(a+b) mod 59` with 30% train fraction.
 
+## Visualizations & Mechanisms Dashboard
+
+We provide a comprehensive interactive dashboard and visualization toolkit for tracking the internal mechanisms of grokking.
+
+To run the interactive Dash/Plotly report:
+```bash
+python viz/dashboard.py
+```
+
+See `docs/GROKKING_MECHANISMS.md` for a summary of the insights these visualizations provide regarding attention evolution, circuit discovery, and loss landscape geometry.
+
 ## Repository layout
 
 ```
+viz/
+  dashboard.py             # Plotly dashboard for interactive exploration
+  attention_evolution.py   # Heatmaps of attention patterns over training
+  circuit_analysis.py      # Induction head tracking and clustering
+  weight_analysis.py       # Loss landscapes and Hessian eigenvalues
+
 src/
   train.py                 # core training loop
   data.py                  # dataset generation + collapse + label noise

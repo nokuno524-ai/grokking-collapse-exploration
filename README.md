@@ -15,6 +15,13 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.
 
+### 📊 Comprehensive Visualization and Analysis Suite
+A sophisticated mechanistic interpretability toolkit has been integrated:
+- **Attention Evolution (`visualization/attention_evolution.py`):** Heatmaps and animated GIFs tracking how attention patterns (especially `pos 1 -> pos 0` causal links) evolve over training steps, allowing comparison between grokking (pure) and collapsed models.
+- **Weight Geometry (`visualization/weight_analysis.py`):** Deep tracking of weight norm trajectories, Kernel Density Estimates (KDEs) of weight distributions, and Singular Value Decomposition (SVD) spectral decay for attention projections.
+- **Circuit Detection (`analysis/circuit_detection.py`):** Measures effective rank and participation ratio to identify the exact step subnetworks functionalize ("circuit formation").
+- **Integrated Report:** Running `analysis/generate_report.py` produces `results/comprehensive_report.pdf`, aggregating all the statistical metrics, trajectory visualizations, and SVD plots into a unified document.
+
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
 ## Quick start

@@ -17,6 +17,25 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+
+## Experimental Findings: Grokking and Model Collapse
+
+1. **Collapse Prevents Grokking**: Pure data groks at step 1400 (100% accuracy), low collapse at 3100 (93%), but medium, high, and severe collapse entirely fail to grok.
+2. **Weight Norm Reduction**: Correlates inversely with collapse severity. Severe collapse limits reduction to ~30-42%, preventing the transition to generalization.
+3. **Label Noise Equivalence**: The failure is statistically indistinguishable from uniform random label noise at a matched rate (e.g., 15%). The rate of noise is what matters.
+4. **Scarcity Dissociation**: Training on 50% pure data still groks (better than full dataset), but corrupting 15% prevents it. Contamination is not just effective sample-size shrinkage.
+
+For the full detailed findings, see `docs/RESULTS.md`.
+
+## Comprehensive Analysis and Visualization Tools
+The `src/analysis/` and `src/viz/` directories now contain robust tools for:
+- Computing bootstrap confidence intervals for experimental comparisons (`src/analysis/experiment_comparison.py`).
+- Tracking gradient norms and weight norms per layer (`src/analysis/gradient_flow.py`, `src/analysis/weight_analysis.py`).
+- Clustering attention patterns (`src/analysis/circuit_detection.py`).
+- Plotting rich, interactive dashboards using Plotly (`src/viz/attention_viz.py`, `src/viz/training_dashboard.py`, `src/viz/collapse_progression.py`).
+
+See `docs/RESULTS.md` for a summary of experimental findings.
+
 ## Quick start
 
 ```bash

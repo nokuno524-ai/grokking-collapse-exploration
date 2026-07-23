@@ -100,12 +100,16 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            loss = F.cross_entropy(logits, targets)
-            total_loss += loss.item() * inputs.shape[0]
+            with torch.autocast(device_type=device.type if device.type != "mps" else "cpu"):
+                logits = model(inputs)
+                loss = F.cross_entropy(logits, targets)
+            total_loss += float(loss.item()) * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 
@@ -117,8 +121,15 @@ def train(config: TrainConfig) -> TrainState:
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
     
     # Set seeds
+    import random
+    import numpy as np
+    random.seed(config.seed)
+    np.random.seed(config.seed)
     torch.manual_seed(config.seed)
-    torch.cuda.manual_seed_all(config.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config.seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     # Generate data
     data_config = DatasetConfig(

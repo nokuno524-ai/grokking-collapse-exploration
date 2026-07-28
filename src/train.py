@@ -100,12 +100,16 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
-            logits = model(inputs)
-            loss = F.cross_entropy(logits, targets)
-            total_loss += loss.item() * inputs.shape[0]
+            with torch.autocast(device_type=device.type if device.type != "mps" else "cpu"):
+                logits = model(inputs)
+                loss = F.cross_entropy(logits, targets)
+            total_loss += float(loss.item()) * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 
@@ -182,8 +186,9 @@ def train(config: TrainConfig) -> TrainState:
         inputs, targets = inputs.to(device), targets.to(device)
         
         # Forward
-        logits = model(inputs)
-        loss = F.cross_entropy(logits, targets)
+        with torch.autocast(device_type=device.type if device.type != "mps" else "cpu"):
+            logits = model(inputs)
+            loss = F.cross_entropy(logits, targets)
         
         # Backward
         optimizer.zero_grad()
@@ -191,7 +196,7 @@ def train(config: TrainConfig) -> TrainState:
         optimizer.step()
         
         state.step = step
-        state.train_loss = loss.item()
+        state.train_loss = float(loss.item())
         
         # Evaluate periodically
         if step % config.eval_every == 0:

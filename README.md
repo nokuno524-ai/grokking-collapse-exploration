@@ -22,7 +22,7 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install torch numpy matplotlib scipy seaborn statsmodels
 
 # Single training run
 python src/train.py --condition pure --max-steps 50000
@@ -50,6 +50,9 @@ python src/transplant_rescue.py \
 ## Repository layout
 
 ```
+analysis/
+  attention_pattern_analysis.py # attention heatmaps, circuit extraction, entropy tracking
+  weight_analysis.py            # weight norms, SVD rank evolution, representation differences
 src/
   train.py                 # core training loop
   data.py                  # dataset generation + collapse + label noise
@@ -71,7 +74,16 @@ src/
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
+tests/                     # pytest suite for data, model, and analysis utilities
 ```
+
+## New Mechanistic Analysis Tools
+
+A comprehensive suite of analysis tools has been added to mechanically interpret the network during the grokking phase and under varying degrees of model collapse. These tools generate publication-ready visualizations and track structural changes:
+- **Attention Heatmaps & Entropy Evolution:** Extract true Q/K/V attention patterns to observe circuit formation and information routing.
+- **Weight Norms & SVD Rank Tracking:** Visualize how parameter count and effective matrix rank decrease precisely at the point of grokking.
+
+See `EXPERIMENT_FINDINGS.md` for methodology details and visualization generation guides.
 
 ## References
 

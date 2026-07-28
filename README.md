@@ -82,3 +82,25 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Phase Transition & Scaling Methodology
+
+In addition to our primary experiments on the "grokking cliff" and scarcity, we include a comprehensive set of tools for quantitative phase transition analysis and scaling studies.
+
+### Phase Transition Analysis
+The module `src/analysis/phase_transition.py` provides an automated toolkit to rigorously evaluate the grokking phase transition:
+- **`detect_grokking_point`**: Automatically detects the exact grokking step using the discrete derivative of the test accuracy curve.
+- **`measure_phase_transition_sharpness`**: Fits a logistic curve to quantify transition sharpness.
+- **`compute_grokking_delay`**: Calculates the lag between data memorization and actual generalization.
+- **`bootstrap_grokking_ci`**: Generates bootstrap confidence intervals on the grokking step.
+
+### Scaling Experiments
+We provide a unified infrastructure to evaluate the effect of model scaling and dataset proportions on grokking through `src/experiments/run_scaling.py`:
+- Varied parameters: Model dimensionality (`d_model` ∈ {64, 128, 256}), number of attention heads (`n_heads` ∈ {2, 4, 8}), dataset fraction (`train_fraction` ∈ {0.2, 0.3, 0.4}), and collapse levels (0% to 100%).
+- Result Aggregation: Run `src/analysis/aggregate_scaling_results.py` to compile results, produce summary tables, generate heatmaps (e.g., grokking step vs. collapse level), and automatically produce a `FINDINGS.md` summary report.
+
+### Effective Circuit Complexity
+The module `src/analysis/circuit_complexity.py` enables mechanistic tracking during grokking:
+- **Attention Rank**: Tracks effective rank of attention weight matrices per layer/head across training.
+- **Participation Ratio**: Measures the effective dimensionality of intermediate activations.
+- **Information Flow Proxy (CKA)**: Calculates information retention mapping between input and successive model layers.

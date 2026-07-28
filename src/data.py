@@ -39,7 +39,7 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     
     # Shuffle and split
     indices = rng.permutation(len(all_pairs))
-    n_train = int(len(all_pairs) * config.train_fraction)
+    n_train = int(round(len(all_pairs) * config.train_fraction))
     train_idx = indices[:n_train]
     test_idx = indices[n_train:]
     
@@ -83,7 +83,7 @@ def apply_collapse(
     - Occasional errors (assigns probability mass incorrectly)
     - Loss of rare outputs
     """
-    n_replace = int(len(targets) * collapse_level)
+    n_replace = int(round(len(targets) * collapse_level))
     replace_idx = rng.choice(len(targets), n_replace, replace=False)
     
     # Compute target frequency distribution
@@ -130,7 +130,7 @@ def apply_label_noise(
     The new label is drawn uniformly from the (prime-1) values different from the original
     so the corruption is always observable.
     """
-    n_replace = int(len(targets) * noise_fraction)
+    n_replace = int(round(len(targets) * noise_fraction))
     if n_replace == 0:
         return list(pairs), list(targets)
     replace_idx = rng.choice(len(targets), n_replace, replace=False)

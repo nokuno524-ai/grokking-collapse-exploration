@@ -40,6 +40,14 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Analysis Methodology
+
+We implement a deep mechanistic analysis suite in the `analysis/` directory to investigate grokking and model collapse:
+
+1. **Attention Analysis (`attention_analysis.py`)**: Since the standard `nn.TransformerEncoderLayer` does not natively return attention weights, we manually project token inputs using `in_proj_weight` and `in_proj_bias` to recover the true Queries, Keys, and Values. We then measure the Shannon entropy of these attention weights to track head specialization (diffuse vs. sharp attention) over training.
+2. **Circuit Analysis (`circuit_analysis.py`)**: We identify circuits critical for grokking using targeted activation ablation. By selectively zeroing out the outputs of specific attention heads during a forward pass and measuring the impact on the loss, we calculate circuit importance. We track how collapse inhibits the formation of these circuits.
+3. **Weight Geometry (`weight_analysis.py`)**: We analyze weight matrices across checkpoints, computing the L2 weight norm trajectory. Using Singular Value Decomposition (SVD), we analyze the singular value spectrum and effective dimensionality (rank collapse) of models under varying data regimes.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

@@ -146,6 +146,83 @@ def apply_label_noise(
     return new_pairs, new_targets
 
 
+def generate_collapsed_data(base_data: list, prime: int, collapse_method: str, severity: float, rng: np.random.RandomState) -> list:
+    """
+    Applies a specific collapse method to generate synthetic data.
+
+    Supported methods:
+    - 'temperature': Warps the frequency distribution using a temperature parameter.
+    - 'model_generated': Simulates a model prioritizing high-frequency items and making uniform random errors otherwise.
+    - 'ngram_filtering': Removes rare items entirely based on severity threshold.
+    """
+    if not base_data:
+        return []
+
+    from collections import Counter
+    target_counts = Counter(base_data)
+    total = len(base_data)
+    freq = {t: c / total for t, c in target_counts.items()}
+
+    collapsed_probs = {}
+
+    if collapse_method == "temperature":
+        temp = max(0.01, 1.0 - severity)
+        for t in range(prime):
+            base_prob = freq.get(t, 1.0 / prime)
+            collapsed_probs[t] = base_prob ** (1.0 / temp)
+
+    elif collapse_method == "model_generated":
+        # Simulates a model dropping the tail.
+        # Severity = proportion of probability mass assigned uniformly (error rate)
+        # 1-Severity = probability mass assigned to the top k items
+
+        # Sort by frequency
+        sorted_items = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+        # Keep top half of items as the "model's preferred outputs"
+        k = max(1, len(sorted_items) // 2)
+        top_k = set(item[0] for item in sorted_items[:k])
+
+        for t in range(prime):
+            if t in top_k:
+                collapsed_probs[t] = freq.get(t, 1.0 / prime) * (1.0 - severity) + (severity / prime)
+            else:
+                collapsed_probs[t] = severity / prime
+
+    elif collapse_method == "ngram_filtering":
+        # Simulates collapse by strictly filtering out rare items.
+        # Severity controls the filtering threshold (0 = keep all, 1 = keep only the most frequent)
+        sorted_items = sorted(freq.items(), key=lambda x: x[1], reverse=True)
+
+        # Keep only the top (1 - severity) fraction of the vocabulary
+        keep_fraction = max(0.01, 1.0 - severity)
+        keep_k = max(1, int(prime * keep_fraction))
+
+        top_k = set(item[0] for item in sorted_items[:keep_k])
+
+        for t in range(prime):
+            if t in top_k:
+                collapsed_probs[t] = freq.get(t, 1.0 / prime)
+            else:
+                collapsed_probs[t] = 0.0
+    else:
+        raise ValueError(f"Unknown collapse method: {collapse_method}")
+
+    # Normalize
+    total_prob = sum(collapsed_probs.values())
+    if total_prob > 0:
+        collapsed_probs = {t: p / total_prob for t, p in collapsed_probs.items()}
+    else:
+        # Fallback to uniform if something went wrong
+        collapsed_probs = {t: 1.0 / prime for t in range(prime)}
+
+    collapsed_targets = list(collapsed_probs.keys())
+    collapsed_weights = [collapsed_probs[t] for t in collapsed_targets]
+
+    # Generate new dataset of the same size
+    new_data = rng.choice(collapsed_targets, size=len(base_data), p=collapsed_weights).tolist()
+    return new_data
+
+
 def get_all_conditions(prime: int = 59, seed: int = 42) -> dict:
     """Get all experimental conditions."""
     return {

@@ -82,3 +82,17 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Interpretability Methodology
+
+Our mechanistic interpretability pipeline analyzes the failure of grokking under model collapse conditions through:
+
+1.  **Weight Geometry (src/analysis/weight_analysis.py):**
+    *   Per-layer L1, L2, spectral, and Frobenius norm tracking.
+    *   Effective rank via singular value entropy to capture structural collapse.
+    *   Gradient norm tracking and Hessian max eigenvalue estimation (power iteration) for loss landscape sharpness.
+
+2.  **Circuit Analysis (src/analysis/interpretability.py):**
+    *   **Activation Patching:** Targeted swapping of activations between pure (grokking) and collapsed (non-grokking) models to isolate the precise layers where generalization circuits fail.
+    *   **Attribution & Saliency:** Gradient-based proxy logit attribution to attention heads and MLP neurons.
+    *   **Fourier Representation:** Tracking the embedding Fourier power spectrum to monitor the formation of cyclic arithmetic structures.

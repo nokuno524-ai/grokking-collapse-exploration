@@ -90,23 +90,61 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
-def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device, compute_info: bool = False) -> tuple:
+    """Evaluate model, return (loss, accuracy) and optionally (cka, mutual_info) over a batch."""
     model.eval()
     total_loss = 0.0
     correct = 0
     total = 0
     
+    # Information metrics storage
+    info_metrics = {}
+
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
+
+            # If compute_info is True, we need intermediate representations.
+            # For simplicity, we just use the final representation 'h' before logits in our model.
+            # We recreate a forward pass to extract 'h' if needed.
+            if compute_info and total == 0:  # Only compute on first batch for speed
+                try:
+                    from src.analysis.information import compute_cka, compute_mutual_information
+                    # Extracted forward pass
+                    tok = model.token_embed(inputs)
+                    positions = torch.arange(2, device=inputs.device).unsqueeze(0).expand(inputs.shape[0], -1)
+                    pos = model.pos_embed(positions)
+                    h_0 = tok + pos
+                    h_1 = model.transformer(h_0)
+                    h_norm = model.ln(h_1)
+                    h_pool = h_norm.mean(dim=1)
+
+                    # CKA between input embedding (h_0) and final pooled rep (h_pool)
+                    cka = compute_cka(h_0.view(h_0.size(0), -1), h_pool)
+
+                    # Mutual info between targets and pooled rep
+                    # Convert to cpu numpy for hist
+                    mi = compute_mutual_information(targets.cpu().numpy(), h_pool.cpu().numpy())
+
+                    info_metrics['cka_in_out'] = cka
+                    info_metrics['mi_target_out'] = mi
+                except ImportError:
+                    pass
+
             logits = model(inputs)
             loss = F.cross_entropy(logits, targets)
             total_loss += loss.item() * inputs.shape[0]
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
-    
+
+    if total == 0:
+        if compute_info:
+            return 0.0, 0.0, info_metrics
+        return 0.0, 0.0
+
+    if compute_info:
+        return total_loss / total, correct / total, info_metrics
     return total_loss / total, correct / total
 
 
@@ -196,7 +234,12 @@ def train(config: TrainConfig) -> TrainState:
         # Evaluate periodically
         if step % config.eval_every == 0:
             train_loss, train_acc = evaluate(model, train_loader, device)
-            test_loss, test_acc = evaluate(model, test_loader, device)
+            test_res = evaluate(model, test_loader, device, compute_info=True)
+            if len(test_res) == 3:
+                test_loss, test_acc, info_metrics = test_res
+            else:
+                test_loss, test_acc = test_res
+                info_metrics = {}
             
             state.train_loss = train_loss
             state.test_loss = test_loss
@@ -212,6 +255,17 @@ def train(config: TrainConfig) -> TrainState:
                 state.grokking_step = step
                 print(f"🎉 GROKKING at step {step}! Test acc: {test_acc:.4f}")
             
+            # Integrate mechanistic weight analysis
+            try:
+                from src.analysis.weights import get_layer_norms, get_weight_distributions, get_effective_ranks
+                layer_norms = get_layer_norms(model)
+                weight_dists = get_weight_distributions(model)
+                effective_ranks = get_effective_ranks(model)
+            except ImportError:
+                layer_norms = {}
+                weight_dists = {}
+                effective_ranks = {}
+
             # Log
             entry = {
                 "step": step,
@@ -222,6 +276,10 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "layer_norms": layer_norms,
+                "weight_distributions": weight_dists,
+                "effective_ranks": effective_ranks,
+                "info_metrics": info_metrics,
             }
             state.history.append(entry)
             

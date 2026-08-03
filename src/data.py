@@ -19,6 +19,7 @@ class DatasetConfig:
     collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
     noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
     seed: int = 42
+    task: str = "modular_arithmetic"  # "modular_arithmetic", "group_multiplication", "binary_addition", "sparse_parity", "in_context_learning"
 
 
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -146,7 +147,111 @@ def apply_label_noise(
     return new_pairs, new_targets
 
 
-def get_all_conditions(prime: int = 59, seed: int = 42) -> dict:
+from typing import List, Tuple, Dict, Any
+
+def apply_task_logic(all_pairs: List[Tuple[int, int]], all_targets: List[int], config: DatasetConfig, p: int, rng: np.random.RandomState) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Shuffle and split
+    indices = rng.permutation(len(all_pairs))
+    n_train = int(round(len(all_pairs) * config.train_fraction))
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train:]
+
+    train_pairs = [all_pairs[i] for i in train_idx]
+    train_targets_list = [all_targets[i] for i in train_idx]
+    test_pairs = [all_pairs[i] for i in test_idx]
+    test_targets_list = [all_targets[i] for i in test_idx]
+
+    # Apply collapse: replace some training examples with "collapsed" outputs
+    if config.collapse_level > 0:
+        train_pairs, train_targets_list = apply_collapse(
+            train_pairs, train_targets_list, p,
+            config.collapse_level, config.collapse_severity, rng
+        )
+
+    # Apply uniform random label noise (baseline ablation, mutually independent of collapse)
+    if config.noise_fraction > 0:
+        train_pairs, train_targets_list = apply_label_noise(
+            train_pairs, train_targets_list, p,
+            config.noise_fraction, rng,
+        )
+
+    # Convert to tensors
+    train_inputs = torch.tensor(train_pairs, dtype=torch.long)
+    train_targets = torch.tensor(train_targets_list, dtype=torch.long)
+    test_inputs = torch.tensor(test_pairs, dtype=torch.long)
+    test_targets = torch.tensor(test_targets_list, dtype=torch.long)
+
+    return train_inputs, train_targets, test_inputs, test_targets
+
+def generate_group_multiplication(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Non-commutative group. Let's use symmetric group S_3, order 6, or a small matrix group.
+    # To keep it simple and fit in `prime` vocab, let's just do permutation group over a small set.
+    # To have enough data to see grokking, we need more than 6 elements.
+    # Let's use the dihedral group D_n where 2n = p (approx).
+    p = config.prime
+    n = p // 2
+    if p % 2 != 0:
+        p = 2 * n # Adjust effective vocabulary for this task
+
+    rng = np.random.RandomState(config.seed)
+
+    # D_n elements can be written as r^i s^j, i in [0, n-1], j in [0, 1]
+    # Represent as (i, j) -> idx = i * 2 + j
+    def multiply_dn(idx1, idx2):
+        i1, j1 = idx1 // 2, idx1 % 2
+        i2, j2 = idx2 // 2, idx2 % 2
+        if j1 == 0:
+            i_out = (i1 + i2) % n
+            j_out = j2
+        else:
+            i_out = (i1 - i2) % n
+            j_out = j2 ^ 1
+        return i_out * 2 + j_out
+
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [multiply_dn(a, b) for a, b in all_pairs]
+
+    return apply_task_logic(all_pairs, all_targets, config, p, rng)
+
+def generate_binary_addition(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Bitwise XOR addition of small integers
+    p = config.prime
+    # Find next power of 2
+    power = 1
+    while power < p: power *= 2
+    p = power // 2 # stay within prime bounds or just use prime as max
+
+    rng = np.random.RandomState(config.seed)
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [a ^ b for a, b in all_pairs]
+
+    return apply_task_logic(all_pairs, all_targets, config, p, rng)
+
+def generate_sparse_parity(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Inputs are vectors, but our model expects 2 tokens.
+    # Let's formulate it as parity of bitwise AND
+    p = config.prime
+    power = 1
+    while power < p: power *= 2
+    p = power // 2
+
+    rng = np.random.RandomState(config.seed)
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [int(bin(a & b).count('1') % 2) for a, b in all_pairs]
+
+    return apply_task_logic(all_pairs, all_targets, config, p, rng)
+
+def generate_in_context_learning(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Simple copy task: given (a, b), target is a
+    p = config.prime
+    rng = np.random.RandomState(config.seed)
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [a for a, b in all_pairs]
+
+    return apply_task_logic(all_pairs, all_targets, config, p, rng)
+
+
+def get_all_conditions(prime: int = 59, seed: int = 42) -> Dict[str, DatasetConfig]:
     """Get all experimental conditions."""
     return {
         "pure": DatasetConfig(prime=prime, collapse_level=0.0, seed=seed),

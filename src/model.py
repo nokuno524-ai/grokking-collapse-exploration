@@ -61,7 +61,7 @@ class ModularArithmeticTransformer(nn.Module):
         
         self._init_weights()
     
-    def _init_weights(self):
+    def _init_weights(self) -> None:
         """Initialize weights with small random values."""
         for module in self.modules():
             if isinstance(module, nn.Linear):

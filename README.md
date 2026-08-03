@@ -27,6 +27,9 @@ uv pip install torch numpy matplotlib scipy
 # Single training run
 python src/train.py --condition pure --max-steps 50000
 
+# Run multi-task replication (group multiplication, binary addition, etc.)
+python src/run_multitask.py --max-steps 50000
+
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
 
@@ -39,6 +42,15 @@ python src/transplant_rescue.py \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
 ```
+
+## Multi-Task Replication
+
+We test whether the collapse-prevents-grokking finding generalizes by supporting multiple synthetic tasks. You can specify a task directly in code or use the `run_multitask.py` sweep. Supported tasks:
+- `modular_arithmetic` (default)
+- `group_multiplication`
+- `binary_addition`
+- `sparse_parity`
+- `in_context_learning`
 
 ## Architecture
 

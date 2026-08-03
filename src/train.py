@@ -33,6 +33,9 @@ class TrainConfig:
     d_ff: int = 512
     n_layers: int = 1
     
+    # Task
+    task: str = "modular_arithmetic"
+
     # Training
     max_steps: int = 50000
     lr: float = 1e-3
@@ -90,13 +93,64 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
-def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+def compute_hessian_max_eigenvalue(model: nn.Module, inputs: torch.Tensor, targets: torch.Tensor, max_iters: int = 10) -> float:
+    """Computes the largest eigenvalue of the Hessian matrix using power iteration."""
+    # Disable SDP backends on CPU to avoid RuntimeError as instructed in AGENTS.md / memory
+    if not inputs.is_cuda:
+        torch.backends.cuda.enable_flash_sdp(False)
+        torch.backends.cuda.enable_math_sdp(True)
+        torch.backends.cuda.enable_mem_efficient_sdp(False)
+
+    model.eval()
+
+    # We only care about parameters that require gradients
+    params = [p for p in model.parameters() if p.requires_grad]
+
+    # First forward and backward to get gradients
+    logits = model(inputs)
+    loss = F.cross_entropy(logits, targets)
+
+    # Compute first-order gradients
+    grads = torch.autograd.grad(loss, params, create_graph=True, retain_graph=True)
+
+    # Initialize random vector v with the same shape as parameters
+    v = [torch.randn_like(p) for p in params]
+
+    # Normalize v
+    v_norm = torch.sqrt(sum(torch.sum(x**2) for x in v))
+    v = [x / v_norm for x in v]
+
+    eigenvalue = 0.0
+
+    for _ in range(max_iters):
+        # Compute dot product of gradients and v
+        grad_v = sum(torch.sum(g * x) for g, x in zip(grads, v))
+
+        # Compute Hessian-vector product
+        # H*v = d(grad_v)/d(params)
+        Hv = torch.autograd.grad(grad_v, params, retain_graph=True)
+
+        # Compute Rayleigh quotient: v^T * H * v
+        eigenvalue = sum(torch.sum(x * y) for x, y in zip(v, Hv)).item()
+
+        # Update v for next iteration
+        Hv_norm = torch.sqrt(sum(torch.sum(x**2) for x in Hv))
+        if Hv_norm == 0:
+            break
+        v = [x / Hv_norm for x in Hv]
+
+    return eigenvalue
+
+def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device, compute_info: bool = False) -> tuple:
+    """Evaluate model, return (loss, accuracy) and optionally information metrics."""
     model.eval()
     total_loss = 0.0
     correct = 0
     total = 0
     
+    all_inputs = []
+    all_logits = []
+
     with torch.no_grad():
         for inputs, targets in dataloader:
             inputs, targets = inputs.to(device), targets.to(device)
@@ -106,8 +160,28 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+            if compute_info and len(all_inputs) < 10: # limit info computation to some batches to save memory
+                all_inputs.append(inputs)
+                all_logits.append(logits)
+
+    if total == 0:
+        return 0.0, 0.0, {} if compute_info else (0.0, 0.0)
+
+    avg_loss = total_loss / total
+    acc = correct / total
     
-    return total_loss / total, correct / total
+    if compute_info and len(all_inputs) > 0:
+        from analysis.information import compute_information_flow
+        cat_inputs = torch.cat(all_inputs, dim=0)
+        cat_logits = torch.cat(all_logits, dim=0)
+        info_metrics = compute_information_flow(model, cat_inputs, cat_logits)
+        return avg_loss, acc, info_metrics
+
+    if compute_info:
+        return avg_loss, acc, {}
+
+    return avg_loss, acc
 
 
 def train(config: TrainConfig) -> TrainState:
@@ -128,8 +202,26 @@ def train(config: TrainConfig) -> TrainState:
         collapse_severity=config.collapse_severity,
         noise_fraction=config.noise_fraction,
         seed=config.seed,
+        task=config.task,
     )
-    train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
+
+    if config.task == "modular_arithmetic":
+        from data import generate_modular_arithmetic
+        train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
+    elif config.task == "group_multiplication":
+        from data import generate_group_multiplication
+        train_in, train_tgt, test_in, test_tgt = generate_group_multiplication(data_config)
+    elif config.task == "binary_addition":
+        from data import generate_binary_addition
+        train_in, train_tgt, test_in, test_tgt = generate_binary_addition(data_config)
+    elif config.task == "sparse_parity":
+        from data import generate_sparse_parity
+        train_in, train_tgt, test_in, test_tgt = generate_sparse_parity(data_config)
+    elif config.task == "in_context_learning":
+        from data import generate_in_context_learning
+        train_in, train_tgt, test_in, test_tgt = generate_in_context_learning(data_config)
+    else:
+        raise ValueError(f"Unknown task: {config.task}")
     
     train_dataset = TensorDataset(train_in, train_tgt)
     test_dataset = TensorDataset(test_in, test_tgt)
@@ -188,6 +280,17 @@ def train(config: TrainConfig) -> TrainState:
         # Backward
         optimizer.zero_grad()
         loss.backward()
+
+        # Compute gradient norm
+        grad_norm = 0.0
+        layer_grad_norms = {}
+        for name, p in model.named_parameters():
+            if p.grad is not None:
+                g_norm = p.grad.norm().item()
+                grad_norm += g_norm ** 2
+                layer_grad_norms[f"grad_norm_{name}"] = g_norm
+        grad_norm = grad_norm ** 0.5
+
         optimizer.step()
         
         state.step = step
@@ -195,9 +298,52 @@ def train(config: TrainConfig) -> TrainState:
         
         # Evaluate periodically
         if step % config.eval_every == 0:
-            train_loss, train_acc = evaluate(model, train_loader, device)
-            test_loss, test_acc = evaluate(model, test_loader, device)
+            # compute Hessian max eigenvalue on a subset of training data
+            hessian_max_ev = compute_hessian_max_eigenvalue(model, inputs[:64], targets[:64])
             
+            # Compute gradient noise scale on a couple batches
+            model.eval()
+            grad_variances = []
+            tmp_grads = []
+            n_batches_for_noise = 5
+            dl_iter = iter(train_loader)
+            with torch.enable_grad():
+                for _ in range(n_batches_for_noise):
+                    try:
+                        b_in, b_tgt = next(dl_iter)
+                    except StopIteration:
+                        break
+                    b_in, b_tgt = b_in.to(device), b_tgt.to(device)
+                    optimizer.zero_grad()
+                    b_logits = model(b_in)
+                    b_loss = F.cross_entropy(b_logits, b_tgt)
+                    b_loss.backward()
+
+                    batch_grads = []
+                    for p in model.parameters():
+                        if p.grad is not None:
+                            batch_grads.append(p.grad.detach().clone().flatten())
+
+                    if batch_grads:
+                        tmp_grads.append(torch.cat(batch_grads))
+
+            if len(tmp_grads) > 1:
+                stacked_grads = torch.stack(tmp_grads) # (n_batches, total_params)
+                grad_noise_scale = stacked_grads.var(dim=0).mean().item()
+            else:
+                grad_noise_scale = 0.0
+
+            model.train() # restore train mode
+            optimizer.zero_grad() # clear these tmp grads
+            train_loss, train_acc = evaluate(model, train_loader, device)
+            # Evaluate with compute_info on test set
+            eval_res = evaluate(model, test_loader, device, compute_info=True)
+            if len(eval_res) == 3:
+                test_loss, test_acc, info_metrics = eval_res
+            else:
+                test_loss, test_acc = eval_res
+                info_metrics = {}
+
             state.train_loss = train_loss
             state.test_loss = test_loss
             state.train_acc = train_acc
@@ -222,7 +368,14 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "grad_norm": grad_norm,
+                "grad_noise_scale": grad_noise_scale,
+                "hessian_max_eigenvalue": hessian_max_ev,
             }
+            entry.update(layer_grad_norms)
+            # Add info metrics if available
+            entry.update(info_metrics)
+
             state.history.append(entry)
             
             if step % config.log_every == 0 or state.grokked:
@@ -269,7 +422,7 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> dict:
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}

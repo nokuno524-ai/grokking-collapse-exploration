@@ -82,3 +82,9 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Publication Materials
+- `scripts/make_paper_figures.py`: Generates publication-ready figures (Figures 1-4) in PDF and PNG formats.
+- `src/analysis/statistics.py`: Computes statistical significance (Mann-Whitney U, Cohen's d) for grokking step comparisons and outputs a LaTeX table.
+- `configs/ablations/`: Ablation study configurations (lr, wd, depth, noise).
+- `scripts/run_ablations.py`: Runner for all ablation experiments.

@@ -71,6 +71,17 @@ src/
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
+docs/                      # research summaries and findings
+src/viz/                   # visualization tools (e.g. attention heatmaps)
+
+## New Analytical Tools
+
+This repository now includes an expanded suite of analytical tools to mechanistically dissect the interplay of grokking and collapse:
+- **J-Lens Analysis:** (`src/analysis/jlens.py`, `run_jlens.py`) simplifies Jacobian lenses to track the entropy and rank of vocabulary-projected representations.
+- **Feature Evolution Tracking:** (`src/analysis/feature_evolution.py`) measures the longitudinal degradation of Fourier circuits and attention specialization across collapse severity.
+- **Attention Map Visualization:** (`src/viz/attention_patterns.py`) generates heatmaps detailing how internal model attention breaks down under collapse.
+
+Check out `docs/RESULTS_SUMMARY.md` for our latest synthesized findings.
 ```
 
 ## References

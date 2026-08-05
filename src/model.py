@@ -104,13 +104,19 @@ class ModularArithmeticTransformer(nn.Module):
         return logits
     
     def get_weight_norm(self) -> float:
-        """Get total L2 norm of all parameters."""
+        """
+        Get total L2 norm of all parameters.
+        Returns the scalar L2 norm.
+        """
         return sum(p.norm().item() ** 2 for p in self.parameters()) ** 0.5
     
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
         """
         Compute the Fourier spectrum of the token embedding matrix.
         Returns the magnitude of the DFT of each embedding dimension.
+
+        Returns:
+            Tensor of shape (prime, d_model) containing magnitude spectrum.
         """
         W = self.token_embed.weight.detach()  # (prime, d_model)
         # DFT along the token dimension
@@ -118,7 +124,13 @@ class ModularArithmeticTransformer(nn.Module):
         return spectrum
     
     def get_embedding_rank(self) -> float:
-        """Compute effective rank of the embedding matrix."""
+        """
+        Compute effective rank of the embedding matrix.
+        Uses Shannon entropy of normalized singular values.
+
+        Returns:
+            Effective rank (float).
+        """
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
         s = s / s.sum()
@@ -130,7 +142,15 @@ GrokkingTransformer = ModularArithmeticTransformer
 
 
 def count_parameters(model: nn.Module) -> int:
-    """Count trainable parameters."""
+    """
+    Count trainable parameters in a PyTorch model.
+
+    Args:
+        model: The model to count parameters for.
+
+    Returns:
+        Number of trainable parameters.
+    """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 

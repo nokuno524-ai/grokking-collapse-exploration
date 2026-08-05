@@ -39,7 +39,7 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     
     # Shuffle and split
     indices = rng.permutation(len(all_pairs))
-    n_train = int(len(all_pairs) * config.train_fraction)
+    n_train = int(round(len(all_pairs) * config.train_fraction))
     train_idx = indices[:n_train]
     test_idx = indices[n_train:]
     
@@ -82,8 +82,19 @@ def apply_collapse(
     - Narrowed output distribution (favors common results)
     - Occasional errors (assigns probability mass incorrectly)
     - Loss of rare outputs
+
+    Args:
+        pairs: List of input (a, b) pairs.
+        targets: List of integer targets.
+        prime: The modulus p.
+        collapse_level: Fraction of training data replaced by synthetic outputs.
+        collapse_severity: How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed).
+        rng: Random state for reproducible results.
+
+    Returns:
+        new_pairs, new_targets
     """
-    n_replace = int(len(targets) * collapse_level)
+    n_replace = int(round(len(targets) * collapse_level))
     replace_idx = rng.choice(len(targets), n_replace, replace=False)
     
     # Compute target frequency distribution
@@ -129,8 +140,18 @@ def apply_label_noise(
     Replace a fraction of training labels with uniform random labels in [0, prime).
     The new label is drawn uniformly from the (prime-1) values different from the original
     so the corruption is always observable.
+
+    Args:
+        pairs: List of input (a, b) pairs.
+        targets: List of integer targets.
+        prime: The modulus p.
+        noise_fraction: Fraction of training labels replaced with uniform random labels.
+        rng: Random state for reproducible results.
+
+    Returns:
+        new_pairs, new_targets
     """
-    n_replace = int(len(targets) * noise_fraction)
+    n_replace = int(round(len(targets) * noise_fraction))
     if n_replace == 0:
         return list(pairs), list(targets)
     replace_idx = rng.choice(len(targets), n_replace, replace=False)

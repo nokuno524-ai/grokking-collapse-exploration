@@ -82,3 +82,25 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Experiment Design & Key Findings
+
+This project explores how synthetic data contamination (model collapse) influences the grokking phenomenon in small transformers trained on modular arithmetic tasks.
+
+### Key Findings
+1. **Grokking Onset:** Pure data triggers grokking at approximately step 1400.
+2. **Delayed Grokking:** Low collapse (5%) delays grokking significantly (e.g., to step 3100).
+3. **Prevention of Grokking:** Moderate to severe collapse (15%+) completely prevents grokking, confirming that the loss of long-tail data points fundamentally disrupts the sparse feature discovery required for late-stage generalization.
+4. **Weight Norm Correlation:** A sharp 30-42% reduction in weight norm is highly correlated with model collapse severity.
+5. **Attention Disruptions:** As evidenced by attention entropy plots, collapse restricts the formation of crisp, specialized attention heads, leaving attention weights highly entropic and unspecialized.
+
+### Reproduction Instructions
+- **Setup:** Run `uv venv .venv && source .venv/bin/activate` followed by `uv pip install torch numpy matplotlib scipy seaborn pandas`.
+- **Training:** Execute `python src/train.py --all` to run the suite of collapse levels (pure, low, medium, high, severe).
+- **Analysis:** Run `python src/analysis/comprehensive_analysis.py` to generate loss/accuracy and weight norm graphs across the runs.
+- **Attention Visualization:** Run `python src/viz/attention/visualize_attention.py` to plot attention heatmaps and entropy graphs.
+
+### Interpretation Guide
+- **Grokking Indicator:** Test accuracy remaining low until a sudden, rapid jump to >95%, coupled with a drop in test loss.
+- **Attention Entropy:** High entropy implies diffuse, unspecialized attention. Grokking generally pairs with a drop in entropy for specific heads as they specialize in tracking modular operands.
+- **Fourier Concentration:** A concentrated Fourier spectrum indicates the embeddings are structuring themselves correctly on the circle required for modular arithmetic.

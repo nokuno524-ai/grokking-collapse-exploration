@@ -91,7 +91,17 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
 
 
 def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+    """
+    Evaluate model, return (loss, accuracy).
+
+    Args:
+        model: PyTorch model.
+        dataloader: PyTorch DataLoader containing evaluation data.
+        device: Device to place tensors on.
+
+    Returns:
+        tuple containing (loss, accuracy).
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -106,6 +116,9 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 

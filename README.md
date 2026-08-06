@@ -33,6 +33,14 @@ sbatch slurm/exp_c_grid.sbatch
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
 
+# Reproduce all major experiments locally
+python scripts/reproduce_all.py --output-dir results/reproduce
+
+# Quick mode for reproduction (short run for testing)
+python scripts/reproduce_all.py --quick --output-dir results/reproduce_quick
+
+> **Note:** Check out the [`results/reproduce`](results/reproduce) folder for generated outputs after running the scripts.
+
 # Surgical transplant rescue (after Experiment A is run)
 python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \

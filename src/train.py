@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 import json
 import time
+import random
 import os
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
@@ -67,6 +68,8 @@ class TrainState:
     weight_norm: float = 0.0
     embedding_rank: float = 0.0
     fourier_concentration: float = 0.0
+    grad_norm: float = 0.0
+    grad_noise_scale: float = 0.0
     grokked: bool = False
     grokking_step: Optional[int] = None
     grokking_threshold: float = 0.95
@@ -89,6 +92,67 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     top_energy = avg_spectrum.topk(min(top_k, len(avg_spectrum))).values.sum()
     return (top_energy / total_energy).item()
 
+
+
+def compute_gradient_metrics(model: nn.Module, dataloader, optimizer, device) -> tuple:
+    """Compute total gradient norm and a simplified gradient noise scale across mini-batches."""
+    model.train()
+
+    # Store original parameters and gradients so we can restore them
+    orig_params = {n: p.clone() for n, p in model.named_parameters()}
+    orig_grads = {n: p.grad.clone() if p.grad is not None else None for n, p in model.named_parameters()}
+
+    # Compute full batch gradient
+    optimizer.zero_grad()
+    full_loss = 0
+    total_samples = 0
+    for inputs, targets in dataloader:
+        inputs, targets = inputs.to(device), targets.to(device)
+        logits = model(inputs)
+        loss = F.cross_entropy(logits, targets)
+        (loss * inputs.shape[0]).backward()
+        total_samples += inputs.shape[0]
+
+    full_grads = {n: p.grad.clone() / total_samples for n, p in model.named_parameters() if p.grad is not None}
+
+    # Compute mini-batch gradient variance
+    noise_scale = 0.0
+    optimizer.zero_grad()
+
+    # We just sample a few mini-batches to estimate noise to save time
+    n_batches = 0
+    for inputs, targets in dataloader:
+        inputs, targets = inputs.to(device), targets.to(device)
+        logits = model(inputs)
+        loss = F.cross_entropy(logits, targets)
+        loss.backward()
+
+        batch_noise = 0
+        for n, p in model.named_parameters():
+            if p.grad is not None and n in full_grads:
+                diff = p.grad - full_grads[n]
+                batch_noise += diff.norm().item() ** 2
+
+        noise_scale += batch_noise
+        optimizer.zero_grad()
+
+        n_batches += 1
+        if n_batches >= 5: # Only use 5 batches for estimate
+            break
+
+    noise_scale /= max(1, n_batches)
+
+    total_grad_norm = sum(g.norm().item() ** 2 for g in full_grads.values()) ** 0.5
+
+    # Restore original parameters and grads
+    for n, p in model.named_parameters():
+        p.data.copy_(orig_params[n])
+        if orig_grads[n] is not None:
+            p.grad = orig_grads[n]
+        else:
+            p.grad = None
+
+    return total_grad_norm, noise_scale
 
 def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
     """Evaluate model, return (loss, accuracy)."""
@@ -206,6 +270,10 @@ def train(config: TrainConfig) -> TrainState:
             state.embedding_rank = model.get_embedding_rank()
             state.fourier_concentration = compute_fourier_concentration(model)
             
+            grad_norm, grad_noise = compute_gradient_metrics(model, train_loader, optimizer, device)
+            state.grad_norm = grad_norm
+            state.grad_noise_scale = grad_noise
+
             # Detect grokking
             if test_acc >= state.grokking_threshold and not state.grokked:
                 state.grokked = True
@@ -222,6 +290,8 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "grad_norm": state.grad_norm,
+                "grad_noise_scale": state.grad_noise_scale,
             }
             state.history.append(entry)
             
@@ -233,6 +303,7 @@ def train(config: TrainConfig) -> TrainState:
                     f"train_acc={train_acc:.4f} test_acc={test_acc:.4f} | "
                     f"‖W‖={state.weight_norm:.2f} rank={state.embedding_rank:.1f} "
                     f"fourier={state.fourier_concentration:.3f} | "
+                    f"grad_norm={state.grad_norm:.2f} noise={state.grad_noise_scale:.2f} | "
                     f"time={elapsed:.1f}s"
                 )
         

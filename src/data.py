@@ -39,7 +39,7 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     
     # Shuffle and split
     indices = rng.permutation(len(all_pairs))
-    n_train = int(len(all_pairs) * config.train_fraction)
+    n_train = int(round(len(all_pairs) * config.train_fraction))
     train_idx = indices[:n_train]
     test_idx = indices[n_train:]
     
@@ -72,9 +72,9 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
 
 
 def apply_collapse(
-    pairs: list, targets: list, prime: int,
+    pairs: list[Tuple[int, int]], targets: list[int], prime: int,
     collapse_level: float, collapse_severity: float, rng: np.random.RandomState
-) -> Tuple[list, list]:
+) -> Tuple[list[Tuple[int, int]], list[int]]:
     """
     Simulate model collapse by replacing some targets with outputs from a "collapsed" model.
     
@@ -122,9 +122,9 @@ def apply_collapse(
 
 
 def apply_label_noise(
-    pairs: list, targets: list, prime: int,
+    pairs: list[Tuple[int, int]], targets: list[int], prime: int,
     noise_fraction: float, rng: np.random.RandomState,
-) -> Tuple[list, list]:
+) -> Tuple[list[Tuple[int, int]], list[int]]:
     """
     Replace a fraction of training labels with uniform random labels in [0, prime).
     The new label is drawn uniformly from the (prime-1) values different from the original

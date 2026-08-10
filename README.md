@@ -11,6 +11,16 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 3. **Noise ≡ "model-collapse" contamination at matched rate.** At noise=0.15, random-label noise and temperature-warped collapse contamination produce statistically indistinguishable test-acc and Fourier-concentration distributions (n=5 each). The original "collapse is a distinct phenomenon" framing is **refuted by our own baseline**.
 4. **Scarcity dissociation.** At 50% less training data, the model still groks and Fourier concentration is *higher* than at full data — while at 15% corrupted data it does not grok. This rules out "contamination = effective sample-size shrinkage" as the mechanism.
 
+## Results Summary
+
+Experiments run on modular arithmetic tasks with varying levels of synthetic data contamination (collapse) reveal:
+
+- **Pure condition** consistently groks at around step 1400.
+- **Low collapse condition** delays grokking (step 3100) and slightly degrades final accuracy (~93%).
+- **Severe collapse** prevents grokking entirely.
+- The weight norm drops significantly under high collapse, indicating reduced effective data diversity which hampers generalization.
+- See `analysis/results_summary.md` and `EXPERIMENT_LOG.md` for full details.
+
 ## Status (2026-05-10)
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.

@@ -325,7 +325,10 @@ def main():
 
     per_seed = per_seed_threshold(rows)
     # Detect regime II (every noise failed at this wd, every seed)
-    regime_ii_wds = sorted({wd for (wd, _), e in per_seed.items() if e == 0.0})
+    regime_ii_wds = sorted({
+        wd for wd in {k[0] for k in per_seed.keys()}
+        if all(e == 0.0 for (w, s), e in per_seed.items() if w == wd)
+    })
     # Build λ array from the seed×wd map (excluding regime II)
     pairs = [(w, e) for (w, _), e in per_seed.items()
              if e > 0 and w not in regime_ii_wds]

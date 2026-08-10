@@ -17,43 +17,14 @@ try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
     from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .config import TrainConfig
+    from .utils import save_results
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
     from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
-
-
-@dataclass
-class TrainConfig:
-    """Training configuration."""
-    # Model
-    prime: int = 59
-    d_model: int = 128
-    n_heads: int = 4
-    d_ff: int = 512
-    n_layers: int = 1
-    
-    # Training
-    max_steps: int = 50000
-    lr: float = 1e-3
-    weight_decay: float = 1.0  # Key hyperparameter for grokking!
-    batch_size: int = 512
-    
-    # Logging
-    eval_every: int = 100
-    log_every: int = 50
-    save_every: int = 5000
-    
-    # Data
-    collapse_level: float = 0.0
-    collapse_severity: float = 0.5
-    train_fraction: float = 0.3
-    noise_fraction: float = 0.0
-    seed: int = 42
-    
-    # Output
-    output_dir: str = "results"
-    condition_name: str = "default"
+    from config import TrainConfig
+    from utils import save_results
 
 
 @dataclass
@@ -90,7 +61,7 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
-def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
+def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple[float, float]:
     """Evaluate model, return (loss, accuracy)."""
     model.eval()
     total_loss = 0.0
@@ -106,6 +77,9 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 
@@ -247,24 +221,7 @@ def train(config: TrainConfig) -> TrainState:
             }, ckpt_path)
     
     # Save final results
-    results = {
-        "config": asdict(config),
-        "grokked": state.grokked,
-        "grokking_step": state.grokking_step,
-        "final_train_acc": state.train_acc,
-        "final_test_acc": state.test_acc,
-        "final_weight_norm": state.weight_norm,
-        "final_embedding_rank": state.embedding_rank,
-        "final_fourier_concentration": state.fourier_concentration,
-        "history": state.history,
-    }
-    
-    results_path = output_dir / "results.json"
-    with open(results_path, "w") as f:
-        json.dump(results, f, indent=2)
-    
-    print(f"\nResults saved to {results_path}")
-    print(f"Grokked: {state.grokked} at step {state.grokking_step}")
+    save_results(config, state, output_dir)
     
     return state
 

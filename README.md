@@ -17,6 +17,10 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Theory and Extended Experiments
+
+A theoretical framework for modeling model collapse as noise injection and predicting the sharp grokking phase transition is provided in `theory/framework.py`. Extended scaling law experiments across model architectures and data ratios are available in `experiments/scaling_laws.py` (with SLURM orchestration in `slurm/run_scaling.sbatch`). A paper draft outlining these theoretical and empirical findings is located in `paper/`.
+
 ## Quick start
 
 ```bash

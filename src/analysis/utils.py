@@ -76,9 +76,14 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
     
     if output_path is None:
         output_path = results_dir / "training_trajectories.png"
+
+    # Save as PNG
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    # Save as PDF
+    pdf_path = output_path.with_suffix('.pdf')
+    plt.savefig(pdf_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Plot saved to {output_path}")
+    print(f"Plot saved to {output_path} and {pdf_path}")
 
 
 def plot_grokking_comparison(results_dir: Path, output_path: Optional[Path] = None):
@@ -124,9 +129,14 @@ def plot_grokking_comparison(results_dir: Path, output_path: Optional[Path] = No
     
     if output_path is None:
         output_path = results_dir / "grokking_comparison.png"
+
+    # Save as PNG
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    # Save as PDF
+    pdf_path = output_path.with_suffix('.pdf')
+    plt.savefig(pdf_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print(f"Plot saved to {output_path}")
+    print(f"Plot saved to {output_path} and {pdf_path}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 """
 Training loop with grokking detection and progress measures.
+Orchestrates training phases, evaluations, and logging.
 """
 
 import torch
@@ -107,6 +108,8 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
     
+    if total == 0:
+        return 0.0, 0.0
     return total_loss / total, correct / total
 
 

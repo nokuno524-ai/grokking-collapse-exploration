@@ -1,5 +1,6 @@
 """
 Small transformer model for modular arithmetic tasks.
+Defines the core `ModularArithmeticTransformer` used across experiments.
 Based on the architecture from Power et al. (2022) and Chan et al. (2023).
 """
 
@@ -121,7 +122,10 @@ class ModularArithmeticTransformer(nn.Module):
         """Compute effective rank of the embedding matrix."""
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
-        s = s / s.sum()
+        s_sum = s.sum()
+        if s_sum < 1e-10:
+            return 1.0
+        s = s / s_sum
         entropy = -(s * torch.log(s + 1e-10)).sum()
         return torch.exp(entropy).item()
 

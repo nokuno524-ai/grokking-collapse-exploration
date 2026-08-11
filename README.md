@@ -73,6 +73,48 @@ analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
 
+## Experiment Overview
+
+This project investigates the interplay between Large Language Model (LLM) model collapse (degenerative training on synthetic data) and grokking (delayed generalization). We utilize a controlled modular arithmetic synthetic task to map the transition boundaries where generalization breaks down.
+
+## Key Findings
+
+- **Grokking dynamics**: Pure data successfully groks at step 1400 (reaching 100% test accuracy).
+- **Collapse vs Grokking**: Medium, severe, and high collapse levels all **FAIL** to grok.
+- **Weight Norm Reduction**: Weight norm reduction correlates directly with collapse severity, dropping between 30-42%.
+
+## Methodology
+
+- **Task**: The model is trained on a synthetic modular arithmetic task `(a + b) mod 59`.
+- **Data Splitting**: We allocate 30% of possible pairs for training and 70% for testing.
+- **Analysis Pipeline**: The codebase features metrics for tracking statistical significance, calculating Cohen's d, generating bootstrap CIs, evaluating the Shannon entropy of normalized singular values (SVD ranks), identifying salient attention heads (using integrated gradients), and visualizing attention patterns.
+
+## Reproduction Instructions
+
+To reproduce the analysis and tests:
+
+```bash
+# Setup the environment
+uv venv .venv && source .venv/bin/activate
+uv pip install -e . pytest pytest-cov scipy seaborn pandas matplotlib
+
+# Run the test suite
+uv run pytest
+
+# Execute training manually
+python src/train.py --condition pure --max-steps 50000
+```
+
+## Parameter Descriptions
+
+- **`prime`**: The modulus value for the arithmetic task (default: 59).
+- **`d_model`**: Dimensionality of the model embeddings.
+- **`n_heads`**: Number of attention heads.
+- **`collapse_level`**: The fraction of training data explicitly replaced by synthetic counterparts to simulate model collapse.
+- **`collapse_severity`**: Controls the temperature of the "collapsed" synthetic generator (0=fresh, 1=fully collapsed).
+- **`noise_fraction`**: Baseline fraction of training labels randomly corrupted.
+- **`train_fraction`**: Ratio of data used for training vs validation.
+
 ## References
 
 - Power et al. (2022), *Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets*.

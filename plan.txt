@@ -1,0 +1,15 @@
+1. We need to implement `analysis/linkage.py` that processes the existing log format.
+It should scan the `results/` directory for runs like `results/multi_seed/*/pure/results.json`, `results/exp_c_grid/wd*/noise*/seed_*/results.json`, and the top-level run folders like `results/pure/`, `results/low_collapse/`, etc.
+It needs to extract `grokking_step` (first step where val accuracy crosses configurable threshold `tau`), final val accuracy, weight-norm trajectory, and attention-entropy drift (if available). Wait, wait. "collapse severity (categorical and continuous via weight-norm drop percentage)".
+
+2. In `analysis/linkage.py`:
+- `load_run_data(filepath)`
+- Extract `weight_norm_drop` (peak early weight norm vs final weight norm or start vs final) - wait, "weight-norm drop percentage".
+- Compute correlation: continuous severity (weight norm drop) vs grok delay, bootstrap CIs.
+- Fit log-linear `delay vs severity` and logistic `success-probability-vs-severity`.
+
+3. `analysis/predictors.py`: early-warning metrics computed only from the pre-grok window (e.g., steps < 50% of typical grok onset). weight-norm slope, training-loss plateau curvature, accuracy variance. Simple predictor for eventual grok success. Calculate AUROC with CIs.
+
+4. Visualization scripts.
+5. LINKAGE_REPORT.md.
+6. pytest tests.

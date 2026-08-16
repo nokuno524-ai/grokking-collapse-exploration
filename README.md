@@ -17,6 +17,8 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+See `docs/ANALYSIS.md` for instructions on running the mechanistic analysis and figure generation suite, which correlates weight-norm reduction to collapse severity and maps the delayed grokking thresholds.
+
 ## Quick start
 
 ```bash

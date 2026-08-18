@@ -38,7 +38,18 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Results Analysis and Loss Curve Plotting
+python src/analysis/results_analysis.py --results-dir results --output-csv analysis/aggregated_results.csv --output-plot analysis/loss_curves_summary.png
+
+# Attention Pattern Visualization
+python src/analysis/attention_vis.py --output-dir analysis/attention
 ```
+
+## Figure Gallery
+- **`analysis/loss_curves_summary.png`**: Visualizes training and testing loss curves aggregated across collapse conditions. Shows how moderate/severe collapse prevents the characteristic delayed grokking drop in test loss.
+- **`analysis/attention/attention_stats.png`**: Displays attention entropy (how uniform/peaked a head is) and specialization across sequence positions (e.g. position 0 vs 1).
+- **`analysis/aggregated_results.csv`**: Automated metrics extracted from all available `results.json` run directories, including an automated continuous grokking-step detector.
 
 ## Architecture
 

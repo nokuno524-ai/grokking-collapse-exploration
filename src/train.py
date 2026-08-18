@@ -106,6 +106,9 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 

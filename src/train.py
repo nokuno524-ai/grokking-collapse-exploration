@@ -13,14 +13,8 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List
 
-try:
-    # Import as a package: `from src.train import train`
-    from .model import ModularArithmeticTransformer
-    from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
-except ImportError:
-    # Run as a script: `python src/train.py`
-    from model import ModularArithmeticTransformer
-    from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+from src.model import ModularArithmeticTransformer
+from src.data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
 
 
 @dataclass
@@ -76,7 +70,14 @@ class TrainState:
 def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: int = 5) -> float:
     """
     Measure how concentrated the Fourier spectrum is on the top-k frequencies.
-    High concentration → grokking has occurred (or is occurring).
+    High concentration -> grokking has occurred (or is occurring).
+
+    Args:
+        model (ModularArithmeticTransformer): The transformer model to evaluate.
+        top_k (int): Number of top frequencies to consider.
+
+    Returns:
+        float: The ratio of energy in the top-k frequencies to total energy.
     """
     spectrum = model.get_embedding_fourier_spectrum()  # (prime, d_model)
     # Average across embedding dimensions
@@ -90,8 +91,18 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
-def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple[float, float]:
+    """
+    Evaluate model and compute loss and accuracy.
+
+    Args:
+        model (nn.Module): Model to evaluate.
+        dataloader (DataLoader): Evaluation dataloader.
+        device (torch.device): Device to run evaluation on.
+
+    Returns:
+        tuple[float, float]: Average loss and accuracy.
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -106,12 +117,23 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment.
+
+    Args:
+        config (TrainConfig): Configuration for the training run.
+
+    Returns:
+        TrainState: The final training state containing metrics and history.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
@@ -269,8 +291,17 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
-    """Run all experimental conditions."""
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> dict:
+    """
+    Run all predefined experimental conditions.
+
+    Args:
+        output_dir (str): Directory to save results.
+        max_steps (int): Maximum number of training steps per condition.
+
+    Returns:
+        dict: A dictionary mapping condition names to their summary results.
+    """
     conditions = get_all_conditions()
     results = {}
     

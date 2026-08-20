@@ -61,8 +61,8 @@ class ModularArithmeticTransformer(nn.Module):
         
         self._init_weights()
     
-    def _init_weights(self):
-        """Initialize weights with small random values."""
+    def _init_weights(self) -> None:
+        """Initialize weights with small random values for Embeddings and Linear layers."""
         for module in self.modules():
             if isinstance(module, nn.Linear):
                 nn.init.normal_(module.weight, std=0.02)
@@ -104,7 +104,7 @@ class ModularArithmeticTransformer(nn.Module):
         return logits
     
     def get_weight_norm(self) -> float:
-        """Get total L2 norm of all parameters."""
+        """Get total L2 norm of all parameters in the model."""
         return sum(p.norm().item() ** 2 for p in self.parameters()) ** 0.5
     
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
@@ -118,10 +118,13 @@ class ModularArithmeticTransformer(nn.Module):
         return spectrum
     
     def get_embedding_rank(self) -> float:
-        """Compute effective rank of the embedding matrix."""
+        """Compute effective rank of the embedding matrix based on SVD entropy."""
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
-        s = s / s.sum()
+        s_sum = s.sum()
+        if s_sum < 1e-10:
+            return 0.0
+        s = s / s_sum
         entropy = -(s * torch.log(s + 1e-10)).sum()
         return torch.exp(entropy).item()
 

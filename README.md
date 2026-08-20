@@ -25,7 +25,10 @@ uv venv .venv && source .venv/bin/activate
 uv pip install torch numpy matplotlib scipy
 
 # Single training run
-python src/train.py --condition pure --max-steps 50000
+python -m src.train --condition pure --max-steps 50000
+
+# Generate Attention Visualization Demo (synthetic data)
+python -m src.viz.attention
 
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
@@ -54,6 +57,8 @@ src/
   train.py                 # core training loop
   data.py                  # dataset generation + collapse + label noise
   model.py                 # ModularArithmeticTransformer (214K params)
+  viz/
+    attention.py           # tools for extracting/plotting attention weights & timeline
   run_exp_c_grid.py        # wd × noise grid driver
   run_grid.py              # collapse-level × severity grid
   run_noise_baseline.py    # uniform-label-noise baseline

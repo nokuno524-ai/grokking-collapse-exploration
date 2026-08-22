@@ -82,3 +82,20 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Paper Artifacts
+
+To regenerate all paper-ready publication figures (PDFs) and the aggregated results summary based on the experiments:
+
+```bash
+# 1. Build the consolidated JSON registry index of all completed runs
+python analysis/registry.py
+
+# 2. Generate the results statistical summary (RESULTS.md)
+PYTHONPATH=. python analysis/write_results_md.py
+
+# 3. Generate all paper figures into paper/figures/
+PYTHONPATH=. python -m src.paper_figures.combine
+```
+
+This artifact pipeline consolidates 235+ result files, computes bootstrap confidence intervals, runs permutation tests for statistical significance of grokking, and plots the headline curves consistently.

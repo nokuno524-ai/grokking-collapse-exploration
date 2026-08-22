@@ -82,3 +82,10 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+### Additions (Current Run)
+
+Added a robust data-generation toolkit with metrics and strict versioning for recursion:
+- Refactored `src/data.py` into a package `src/data/` with `generation.py` and `metrics.py`.
+- Added dataset saving with generation manifests (`save_dataset()`).
+- Added robust generative-diversity measurements (entropy, JS-divergence, etc.) in `src/data/metrics.py`.
+- Tested the code systematically in `tests/data/`.

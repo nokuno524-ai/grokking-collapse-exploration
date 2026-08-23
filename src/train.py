@@ -16,44 +16,13 @@ from typing import Optional, List
 try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
-    from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions, get_task_loaders
+    from .config import ExperimentConfig as TrainConfig
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
-    from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
-
-
-@dataclass
-class TrainConfig:
-    """Training configuration."""
-    # Model
-    prime: int = 59
-    d_model: int = 128
-    n_heads: int = 4
-    d_ff: int = 512
-    n_layers: int = 1
-    
-    # Training
-    max_steps: int = 50000
-    lr: float = 1e-3
-    weight_decay: float = 1.0  # Key hyperparameter for grokking!
-    batch_size: int = 512
-    
-    # Logging
-    eval_every: int = 100
-    log_every: int = 50
-    save_every: int = 5000
-    
-    # Data
-    collapse_level: float = 0.0
-    collapse_severity: float = 0.5
-    train_fraction: float = 0.3
-    noise_fraction: float = 0.0
-    seed: int = 42
-    
-    # Output
-    output_dir: str = "results"
-    condition_name: str = "default"
+    from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions, get_task_loaders
+    from config import ExperimentConfig as TrainConfig
 
 
 @dataclass
@@ -66,11 +35,15 @@ class TrainState:
     test_acc: float = 0.0
     weight_norm: float = 0.0
     embedding_rank: float = 0.0
+    hidden_activation_rank: float = 0.0
+    attention_entropy: float = 0.0
+    train_test_gap_slope: float = 0.0
     fourier_concentration: float = 0.0
     grokked: bool = False
     grokking_step: Optional[int] = None
     grokking_threshold: float = 0.95
     history: List[dict] = field(default_factory=list)
+    _recent_gaps: List[float] = field(default_factory=list)
 
 
 def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: int = 5) -> float:
@@ -106,6 +79,9 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             preds = logits.argmax(dim=-1)
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
+
+    if total == 0:
+        return 0.0, 0.0
     
     return total_loss / total, correct / total
 
@@ -129,28 +105,26 @@ def train(config: TrainConfig) -> TrainState:
         noise_fraction=config.noise_fraction,
         seed=config.seed,
     )
-    train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
-    
-    train_dataset = TensorDataset(train_in, train_tgt)
-    test_dataset = TensorDataset(test_in, test_tgt)
-
-    loader_generator = torch.Generator()
-    loader_generator.manual_seed(config.seed)
-    train_loader = DataLoader(
-        train_dataset, batch_size=config.batch_size, shuffle=True,
-        generator=loader_generator,
+    train_loader, test_loader, metadata = get_task_loaders(
+        task_name=config.task,
+        config=data_config,
+        batch_size=config.batch_size
     )
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
     
     # Create model
     model = ModularArithmeticTransformer(
-        prime=config.prime,
+        prime=metadata["vocab_size"],
         d_model=config.d_model,
         n_heads=config.n_heads,
         d_ff=config.d_ff,
         n_layers=config.n_layers,
     ).to(device)
     
+    # Check if task needs a different output head dimension than prime
+    # (e.g. sparse parity and digit sorting output 2 classes)
+    if metadata["output_classes"] != metadata["vocab_size"]:
+        model.output_head = nn.Linear(config.d_model, metadata["output_classes"]).to(device)
+
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     # Optimizer with weight decay (critical for grokking)
@@ -204,8 +178,22 @@ def train(config: TrainConfig) -> TrainState:
             state.test_acc = test_acc
             state.weight_norm = model.get_weight_norm()
             state.embedding_rank = model.get_embedding_rank()
+            state.hidden_activation_rank = model.get_hidden_activation_rank()
+            state.attention_entropy = model.get_attention_entropy()
             state.fourier_concentration = compute_fourier_concentration(model)
             
+            # Compute train-test gap slope
+            gap = test_loss - train_loss
+            state._recent_gaps.append(gap)
+            if len(state._recent_gaps) > 5:
+                state._recent_gaps.pop(0)
+
+            if len(state._recent_gaps) > 1:
+                # Simple finite difference over the window
+                state.train_test_gap_slope = (state._recent_gaps[-1] - state._recent_gaps[0]) / (len(state._recent_gaps) - 1)
+            else:
+                state.train_test_gap_slope = 0.0
+
             # Detect grokking
             if test_acc >= state.grokking_threshold and not state.grokked:
                 state.grokked = True
@@ -221,6 +209,9 @@ def train(config: TrainConfig) -> TrainState:
                 "test_acc": test_acc,
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
+                "hidden_activation_rank": state.hidden_activation_rank,
+                "attention_entropy": state.attention_entropy,
+                "train_test_gap_slope": state.train_test_gap_slope,
                 "fourier_concentration": state.fourier_concentration,
             }
             state.history.append(entry)
@@ -269,8 +260,17 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
-    """Run all experimental conditions."""
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> dict:
+    """
+    Run all experimental conditions and return the summary results.
+
+    Args:
+        output_dir: Directory to save results.
+        max_steps: Maximum number of training steps per condition.
+
+    Returns:
+        A dictionary mapping condition names to their summary metrics.
+    """
     conditions = get_all_conditions()
     results = {}
     

@@ -21,6 +21,169 @@ class DatasetConfig:
     seed: int = 42
 
 
+def generate_polynomial_identity(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Generate a polynomial identity dataset: (x, y) -> (x^2 + xy + y^2) mod p.
+    """
+    p = config.prime
+    rng = np.random.RandomState(config.seed)
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [(a*a + a*b + b*b) % p for a, b in all_pairs]
+
+    indices = rng.permutation(len(all_pairs))
+    n_train = int(len(all_pairs) * config.train_fraction)
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train:]
+
+    train_pairs = [all_pairs[i] for i in train_idx]
+    train_targets_list = [all_targets[i] for i in train_idx]
+    test_pairs = [all_pairs[i] for i in test_idx]
+    test_targets_list = [all_targets[i] for i in test_idx]
+
+    if config.collapse_level > 0:
+        train_pairs, train_targets_list = apply_collapse(
+            train_pairs, train_targets_list, p,
+            config.collapse_level, config.collapse_severity, rng
+        )
+    if config.noise_fraction > 0:
+        train_pairs, train_targets_list = apply_label_noise(
+            train_pairs, train_targets_list, p,
+            config.noise_fraction, rng,
+        )
+
+    return (torch.tensor(train_pairs, dtype=torch.long),
+            torch.tensor(train_targets_list, dtype=torch.long),
+            torch.tensor(test_pairs, dtype=torch.long),
+            torch.tensor(test_targets_list, dtype=torch.long))
+
+def generate_sparse_parity(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Generate sparse parity dataset. Input is sequence of length 2, values in [0, p).
+    Target is (x + y) % 2.
+    """
+    p = config.prime
+    rng = np.random.RandomState(config.seed)
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [(a + b) % 2 for a, b in all_pairs]
+
+    indices = rng.permutation(len(all_pairs))
+    n_train = int(len(all_pairs) * config.train_fraction)
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train:]
+
+    train_pairs = [all_pairs[i] for i in train_idx]
+    train_targets_list = [all_targets[i] for i in train_idx]
+    test_pairs = [all_pairs[i] for i in test_idx]
+    test_targets_list = [all_targets[i] for i in test_idx]
+
+    # For parity, output is binary, so collapse is just shifting to all 0s or all 1s.
+    if config.collapse_level > 0:
+        train_pairs, train_targets_list = apply_collapse(
+            train_pairs, train_targets_list, 2, # Prime is 2 for output space
+            config.collapse_level, config.collapse_severity, rng
+        )
+    if config.noise_fraction > 0:
+        train_pairs, train_targets_list = apply_label_noise(
+            train_pairs, train_targets_list, 2,
+            config.noise_fraction, rng,
+        )
+
+    return (torch.tensor(train_pairs, dtype=torch.long),
+            torch.tensor(train_targets_list, dtype=torch.long),
+            torch.tensor(test_pairs, dtype=torch.long),
+            torch.tensor(test_targets_list, dtype=torch.long))
+
+def generate_digit_sorting(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Generate digit sorting dataset. Task is to predict whether a > b.
+    Target is 1 if a > b else 0.
+    """
+    p = config.prime
+    rng = np.random.RandomState(config.seed)
+    all_pairs = [(a, b) for a in range(p) for b in range(p)]
+    all_targets = [1 if a > b else 0 for a, b in all_pairs]
+
+    indices = rng.permutation(len(all_pairs))
+    n_train = int(len(all_pairs) * config.train_fraction)
+    train_idx = indices[:n_train]
+    test_idx = indices[n_train:]
+
+    train_pairs = [all_pairs[i] for i in train_idx]
+    train_targets_list = [all_targets[i] for i in train_idx]
+    test_pairs = [all_pairs[i] for i in test_idx]
+    test_targets_list = [all_targets[i] for i in test_idx]
+
+    if config.collapse_level > 0:
+        train_pairs, train_targets_list = apply_collapse(
+            train_pairs, train_targets_list, 2, # Binary output
+            config.collapse_level, config.collapse_severity, rng
+        )
+    if config.noise_fraction > 0:
+        train_pairs, train_targets_list = apply_label_noise(
+            train_pairs, train_targets_list, 2,
+            config.noise_fraction, rng,
+        )
+
+    return (torch.tensor(train_pairs, dtype=torch.long),
+            torch.tensor(train_targets_list, dtype=torch.long),
+            torch.tensor(test_pairs, dtype=torch.long),
+            torch.tensor(test_targets_list, dtype=torch.long))
+
+
+def get_task_loaders(task_name: str, config: DatasetConfig, batch_size: int = 512) -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader, dict]:
+    """
+    Task registry that returns dataloaders and metadata for standard grokking tasks.
+
+    Args:
+        task_name: 'modular_arithmetic', 'polynomial_identity', 'sparse_parity', 'digit_sorting'
+        config: DatasetConfig
+        batch_size: Batch size for dataloaders
+    """
+    task_map = {
+        "modular_arithmetic": generate_modular_arithmetic,
+        "polynomial_identity": generate_polynomial_identity,
+        "sparse_parity": generate_sparse_parity,
+        "digit_sorting": generate_digit_sorting,
+    }
+
+    if task_name not in task_map:
+        raise ValueError(f"Unknown task: {task_name}. Available: {list(task_map.keys())}")
+
+    generate_fn = task_map[task_name]
+    train_in, train_tgt, test_in, test_tgt = generate_fn(config)
+
+    train_dataset = torch.utils.data.TensorDataset(train_in, train_tgt)
+    test_dataset = torch.utils.data.TensorDataset(test_in, test_tgt)
+
+    loader_generator = torch.Generator()
+    loader_generator.manual_seed(config.seed)
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True,
+        generator=loader_generator,
+    )
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False
+    )
+
+    output_size_map = {
+        "modular_arithmetic": config.prime,
+        "polynomial_identity": config.prime,
+        "sparse_parity": 2,
+        "digit_sorting": 2,
+    }
+
+    metadata = {
+        "task": task_name,
+        "vocab_size": config.prime,
+        "output_classes": output_size_map[task_name],
+        "train_size": len(train_dataset),
+        "test_size": len(test_dataset)
+    }
+
+    return train_loader, test_loader, metadata
+
+
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Generate (a, b) -> (a + b) mod p dataset.

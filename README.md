@@ -17,6 +17,16 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Task Suite
+
+The project includes a standard registry of grokking tasks, accessible via `src.data.get_task_loaders`. This registry supports:
+*   **Modular Arithmetic**: `(a + b) mod p` (the canonical grokking task)
+*   **Polynomial Identity**: `(x^2 + xy + y^2) mod p`
+*   **Sparse Parity**: `(a + b) mod 2` evaluated on sequence length 2
+*   **Digit Sorting**: binary classification of whether `a > b`
+
+Each task generator manages deterministic data splits (via fixed seeds), optional label-noise (for baselines), and temperature-warped output distributions simulating iterative model collapse.
+
 ## Quick start
 
 ```bash

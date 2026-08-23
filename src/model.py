@@ -31,6 +31,17 @@ class ModularArithmeticTransformer(nn.Module):
         n_layers: int = 1,
         dropout: float = 0.0,
     ):
+        """
+        Initialize the ModularArithmeticTransformer.
+
+        Args:
+            prime: The modulo/vocabulary size.
+            d_model: Dimensionality of embeddings and hidden states.
+            n_heads: Number of attention heads.
+            d_ff: Dimensionality of feedforward network.
+            n_layers: Number of transformer blocks.
+            dropout: Dropout probability.
+        """
         super().__init__()
         self.prime = prime
         self.d_model = d_model
@@ -122,6 +133,62 @@ class ModularArithmeticTransformer(nn.Module):
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
         s = s / s.sum()
+        entropy = -(s * torch.log(s + 1e-10)).sum()
+        return torch.exp(entropy).item()
+
+    def get_attention_entropy(self) -> float:
+        """
+        Compute mean entropy of attention weights across all heads in the first layer,
+        evaluated over the vocabulary. Serves as an early-warning metric for structure formation.
+        """
+        # PyTorch TransformerEncoderLayer uses MultiheadAttention under the hood.
+        # W_q, W_k are slices of in_proj_weight
+        attn = self.transformer.layers[0].self_attn
+        if attn.in_proj_weight is None:
+            return 0.0 # fallback for non-standard init
+
+        W_q = attn.in_proj_weight[:self.d_model, :].detach()
+        W_k = attn.in_proj_weight[self.d_model:2*self.d_model, :].detach()
+
+        # Estimate attention using W_q W_k^T on embeddings
+        E = self.token_embed.weight.detach() # (prime, d_model)
+
+        Q = E @ W_q.T # (prime, d_model)
+        K = E @ W_k.T # (prime, d_model)
+
+        # Reshape to heads
+        head_dim = self.d_model // self.n_heads
+        Q = Q.view(self.prime, self.n_heads, head_dim)
+        K = K.view(self.prime, self.n_heads, head_dim)
+
+        # Attention scores per head: (prime, prime, n_heads)
+        scores = torch.einsum('ihd,jhd->ijh', Q, K) / math.sqrt(head_dim)
+
+        probs = F.softmax(scores, dim=1) # softmax over keys j
+
+        # Entropy: -sum p log p
+        entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=1) # (prime, n_heads)
+
+        # Mean entropy over tokens and heads
+        return entropy.mean().item()
+
+    def get_hidden_activation_rank(self) -> float:
+        """
+        Compute effective rank of hidden activations.
+        We approximate this by looking at the value matrix projection of embeddings
+        as a proxy for hidden state capacity, to avoid needing a forward pass hook.
+        """
+        attn = self.transformer.layers[0].self_attn
+        if attn.in_proj_weight is None:
+            return 0.0
+
+        W_v = attn.in_proj_weight[2*self.d_model:, :].detach()
+        E = self.token_embed.weight.detach()
+
+        V = E @ W_v.T
+
+        s = torch.linalg.svdvals(V)
+        s = s / (s.sum() + 1e-10)
         entropy = -(s * torch.log(s + 1e-10)).sum()
         return torch.exp(entropy).item()
 

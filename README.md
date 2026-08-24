@@ -24,6 +24,11 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 uv venv .venv && source .venv/bin/activate
 uv pip install torch numpy matplotlib scipy
 
+# Attention Pattern Evolution Analysis
+python scripts/extract_attention.py --output-dir analysis/attention
+python scripts/generate_attention_figs.py
+# (See analysis/attention_findings.md and generated plots in analysis/attention/)
+
 # Single training run
 python src/train.py --condition pure --max-steps 50000
 

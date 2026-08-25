@@ -82,3 +82,13 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Reproducing the phase diagram
+
+To reproduce the severity vs training step phase diagram (which maps out the transition between transitioning, memorizing, and grokking):
+
+```bash
+# Make sure your environment is activated
+uv run python src/analysis/phase_diagram.py
+```
+This script will parse all `results.json` files in the `results/` directory, gracefully handling any missing cells (rendering them as gray spaces), and generate `analysis/phase_diagram.png` and `analysis/critical_step.png`. The full write-up is located in `analysis/PHASE_REPORT.md`.

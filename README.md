@@ -30,6 +30,9 @@ python src/train.py --condition pure --max-steps 50000
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
 
+# Reproduce the phase diagram
+python -m src.analysis.phase_diagram
+
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
 

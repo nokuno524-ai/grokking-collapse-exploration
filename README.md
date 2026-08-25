@@ -40,6 +40,23 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Sweeps
+
+To coordinate and manage parameter sweeps for experiments, use the `sweep/` tools.
+
+1. **Generate**: Provide a base `config.json` and a sweep spec (YAML/JSON with a `parameters` grid and `seeds` list) to generate a set of deterministic experiment directories.
+   ```bash
+   python sweep/generate.py --base base.json --spec sweep.yaml --out-dir results/my_sweep
+   ```
+2. **Collect**: Once experiments are complete, aggregate all `results.json` files into a single CSV. It correctly handles `COMPLETE`, `INCOMPLETE`, and `MISSING` runs.
+   ```bash
+   python sweep/collect.py --run-dir results/my_sweep --out-csv results/my_sweep_results.csv
+   ```
+3. **Plot**: Use the generated CSV to plot the mean grokking step and final test accuracy along a chosen independent axis.
+   ```bash
+   python sweep/plot.py --results-csv results/my_sweep_results.csv --x-axis collapse_severity --out-dir results/plots
+   ```
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

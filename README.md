@@ -82,3 +82,8 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Probes
+
+The `src/probes/` module provides utilities for linear probing on hidden states. It contains tools to extract intermediate activations across the network to classify generalization capabilities.
+See `analysis/PROBE_FINDINGS.md` for a separation curve describing when and where the "grokked" state is linearly decodable in the representation space.

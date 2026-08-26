@@ -82,3 +82,19 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Results & Analysis
+
+Our expanded grid of 235 experimental runs demonstrates a distinct inverse relationship between model collapse severity (noise/contamination fraction) and grokking capability:
+
+1. **Grokking Curve Shift:** The point at which the network "groks" the data is systematically delayed by model collapse contamination.
+2. **Weight Norm Mediation:** Models that successfully grokked maintained an average weight norm of **~35.46**, whereas networks failing to grok exhibited substantially higher norm values (**~43.29** on average). The total parameter L2 norm appears intrinsically tied to grokking phase transitions.
+3. **Attention Entropy Dynamics:** Per-head attention entropy across the single transformer layer exhibits measurable drops coinciding precisely with the grokking phase transition step, validating that representation and head specialization occur late during training.
+
+### Generated Figures
+
+- `figures/attention_evolution.png`: Shows the trajectory of per-head attention entropy and head specialization.
+- `figures/accuracy_curves.png`: Compares train and test accuracy curves across the pure and multi-collapse regimes.
+- `figures/weight_norm_scatter.png`: Illustrates the distribution of final weight norms relative to the successful grokking step, faceted by the initial collapse ratio.
+
+Detailed bootstrap statistics and summary metrics can be found in `results/REPORT.md`.

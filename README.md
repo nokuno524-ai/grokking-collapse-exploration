@@ -82,3 +82,12 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Statistical Protocol
+
+To rigorously validate claims such as "severe collapse completely prevents grokking," we use a multi-seed pipeline and robust changepoint detection:
+
+1. **Multi-Seed Execution:** The `src/run_multi_seed_stats.py` script trains a larger batch of seeds (e.g., N=10) on a fast (small prime, limited steps) configuration. On Slurm, use array jobs to parallelize: `sbatch --array=0-49 slurm/run_stats.sbatch`.
+2. **Cliff Detection:** Grokking transition steps are automatically detected via `detect_grokking_cliff` (in `src/analysis/stats.py`). It uses isotonic regression to fit a piecewise-linear monotonic step function and finds the maximum derivative jump.
+3. **Statistical Tests:** We evaluate the probability of grokking using Wilson score intervals. When comparing two distributions of transition steps, we employ non-parametric Mann-Whitney U tests to calculate p-values.
+4. **Summary Generation:** Running `generate_summary_markdown` builds a publication-ready Markdown table summarizing all CIs and p-values to clarify supported vs. unsupported claims.

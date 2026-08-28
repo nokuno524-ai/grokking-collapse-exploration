@@ -40,6 +40,21 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Circuit transplants
+
+Use the circuit transplant tools to evaluate exactly which layer, head, or MLP contains the parameters responsible for grokking.
+
+```bash
+# Evaluate head and MLP transplants across severities
+python src/transplant/run_transplants.py \
+    --donor-runs results/post_grokking results/pre_grokking \
+    --recipient-runs results/severe_collapse \
+    --components heads mlp ln \
+    --output-csv analysis/transplants.csv \
+    --finetune-steps 100
+```
+Note: Changing LayerNorm weights usually just applies affine shifts rather than transferring specific task circuitry. Evaluate fine-tuning accuracy carefully, as adaptation might conflate grokking circuit presence with generic retraining. See `analysis/CIRCUIT_TRANSPLANT.md` for methodology details.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

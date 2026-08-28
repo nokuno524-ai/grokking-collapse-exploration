@@ -352,6 +352,8 @@ def run_one_variant(
                               randomize=randomize, rng=rng)
     model = build_model(cfg_for_model, device)
     missing, unexpected = model.load_state_dict(sd, strict=False)
+    if missing:
+        raise RuntimeError(f"missing keys when loading patched sd: {missing}")
     if unexpected:
         raise RuntimeError(f"unexpected keys when loading patched sd: {unexpected}")
     train_loader, test_loader = make_loaders(cfg_for_loaders, device=device)

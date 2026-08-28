@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from src.log_loader import load_results_json
 import math
 import re
 from dataclasses import asdict, dataclass

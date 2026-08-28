@@ -82,3 +82,11 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Early-warning indicators
+
+We implement an early-warning predictor framework to detect grokking transitions well before they occur, allowing for efficient screening of training configurations.
+
+- **Methodology**: Rolling-window features (e.g. test accuracy curvature, log-linear weight norm slope) are extracted from training logs and checked against a baseline threshold established in the first few hundred steps.
+- **Usage**: See `eval/predict_grokking.py` to evaluate predictors across different grid severities using leave-one-severity-out validation. Results are outputted to `analysis/EARLY_WARNING.md`.
+- **Limitations**: The predictors were evaluated solely on single-task synthetic runs with a limited set of random seeds. The high false-positive rate on severe collapse regimes suggests additional indicators (such as exact data curvature) may be needed for robust detection.

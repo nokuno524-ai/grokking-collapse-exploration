@@ -59,6 +59,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+from src.log_loader import load_results_json
 import math
 import re
 from dataclasses import dataclass, asdict, field
@@ -155,10 +156,11 @@ def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
     else:
         sd = ckpt
         cfg = {}
-    res_path = run_dir / "results.json"
-    if not cfg and res_path.exists():
-        with res_path.open() as f:
-            cfg = json.load(f).get("config", {})
+    if not cfg:
+        try:
+            cfg = load_results_json(run_dir).get("config", {})
+        except FileNotFoundError:
+            pass
     return sd, cfg
 
 

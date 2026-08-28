@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from src.log_loader import load_results_json
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple

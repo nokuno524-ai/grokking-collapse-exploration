@@ -3,6 +3,7 @@ Visualization and analysis utilities for grokking-collapse experiments.
 """
 
 import json
+from src.log_loader import load_results_json
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -54,8 +55,7 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
     for ax, (metric, title) in zip(axes.flat, metrics):
         for condition_dir in _ordered_condition_dirs(results_dir):
             try:
-                with open(condition_dir / "results.json") as f:
-                    data = json.load(f)
+                data = load_results_json(condition_dir)
                 history = data.get("history", [])
                 if not history:
                     continue
@@ -93,8 +93,7 @@ def plot_grokking_comparison(results_dir: Path, output_path: Optional[Path] = No
     
     for condition_dir in _ordered_condition_dirs(results_dir):
         try:
-            with open(condition_dir / "results.json") as f:
-                data = json.load(f)
+            data = load_results_json(condition_dir)
             conditions.append(condition_dir.name.replace("_", "\n"))
             grokking_steps.append(data.get("grokking_step") or 0)
             test_accs.append(data.get("final_test_acc", 0))

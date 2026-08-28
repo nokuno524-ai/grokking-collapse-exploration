@@ -6,6 +6,7 @@ Based on Chan et al. (2023) "Progress Measures for Grokking via Mechanistic Inte
 import torch
 import numpy as np
 import json
+from src.log_loader import load_results_json
 from pathlib import Path
 from typing import List, Dict, Optional, Iterable
 
@@ -25,8 +26,7 @@ def iter_conditions_by_severity(results_dir: Path) -> Iterable[Path]:
 
 def load_results(condition_dir: Path) -> Dict:
     """Load results JSON for a condition."""
-    with open(condition_dir / "results.json") as f:
-        return json.load(f)
+    return load_results_json(condition_dir)
 
 
 def compute_generalization_gap(history: List[Dict]) -> List[float]:

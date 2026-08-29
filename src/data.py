@@ -21,7 +21,7 @@ class DatasetConfig:
     seed: int = 42
 
 
-def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+def generate_modular_arithmetic(config: DatasetConfig, return_mask: bool = False) -> Tuple:
     """
     Generate (a, b) -> (a + b) mod p dataset.
     
@@ -49,11 +49,14 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     test_targets_list = [all_targets[i] for i in test_idx]
     
     # Apply collapse: replace some training examples with "collapsed" outputs
+    collapse_mask = [False] * len(train_targets_list)
     if config.collapse_level > 0:
-        train_pairs, train_targets_list = apply_collapse(
+        res = apply_collapse(
             train_pairs, train_targets_list, p,
-            config.collapse_level, config.collapse_severity, rng
+            config.collapse_level, config.collapse_severity, rng,
+            return_mask=True
         )
+        train_pairs, train_targets_list, collapse_mask = res
 
     # Apply uniform random label noise (baseline ablation, mutually independent of collapse)
     if config.noise_fraction > 0:
@@ -68,13 +71,17 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     test_inputs = torch.tensor(test_pairs, dtype=torch.long)
     test_targets = torch.tensor(test_targets_list, dtype=torch.long)
     
+
+    if return_mask:
+        return train_inputs, train_targets, test_inputs, test_targets, torch.tensor(collapse_mask, dtype=torch.bool)
     return train_inputs, train_targets, test_inputs, test_targets
 
 
 def apply_collapse(
     pairs: list, targets: list, prime: int,
-    collapse_level: float, collapse_severity: float, rng: np.random.RandomState
-) -> Tuple[list, list]:
+    collapse_level: float, collapse_severity: float, rng: np.random.RandomState,
+    return_mask: bool = False
+) -> Tuple:
     """
     Simulate model collapse by replacing some targets with outputs from a "collapsed" model.
     
@@ -111,13 +118,17 @@ def apply_collapse(
     new_pairs = list(pairs)
     new_targets = list(targets)
     
+    mask = [False] * len(targets)
     for idx in replace_idx:
         # Replace target with sample from collapsed distribution
         new_target = rng.choice(collapsed_targets, p=collapsed_weights)
         new_targets[idx] = int(new_target)
+        mask[idx] = True
         # Optionally also corrupt the pair (simulating input collapse)
         # For now, keep inputs clean — only corrupt outputs
     
+    if return_mask:
+        return new_pairs, new_targets, mask
     return new_pairs, new_targets
 
 

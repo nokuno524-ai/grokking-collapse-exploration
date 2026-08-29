@@ -20,6 +20,12 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 ## Quick start
 
 ```bash
+# Run quantitative weight-space metric extraction
+uv run python scripts/weight_metrics.py --checkpoint_dir results/pure/ --output_csv results/pure/weight_metrics.csv
+
+# Analyze weight space and generate plots over all collapse severities
+uv run python scripts/analyze_weight_metrics.py
+
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
 uv pip install torch numpy matplotlib scipy

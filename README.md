@@ -82,3 +82,24 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Scaling Experiments
+
+To investigate how the interaction between model collapse and grokking scales with model size and dataset size, we provide dedicated scripts:
+
+1. **Running the grid:**
+   ```bash
+   # Run locally
+   python scripts/run_scaling.py --out-file results_scaling/scaling_results.jsonl
+
+   # Or via SLURM
+   sbatch scripts/run_scaling.sbatch
+   ```
+   *Note: Use `--smoke-test` to test the pipeline with tiny parameters.*
+
+2. **Generating Heatmaps:**
+   ```bash
+   python scripts/plot_scaling.py --in-file results_scaling/scaling_results.jsonl --out-dir results_scaling/plots
+   ```
+
+For detailed hypotheses and the experimental design space, see [docs/scaling_plan.md](docs/scaling_plan.md).

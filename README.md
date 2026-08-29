@@ -27,6 +27,9 @@ uv pip install torch numpy matplotlib scipy
 # Single training run
 python src/train.py --condition pure --max-steps 50000
 
+# Run synthetic data detection analysis (evaluates early warning signals)
+python scripts/detect_synthetic.py
+
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
 
@@ -70,7 +73,9 @@ src/
 
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries
+docs/                      # documentation, including detection.md
 results/                   # results.json + checkpoint_*.pt per run
+scripts/                   # auxiliary scripts like detect_synthetic.py
 ```
 
 ## References

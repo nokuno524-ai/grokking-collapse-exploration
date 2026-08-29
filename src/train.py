@@ -269,7 +269,9 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000,
+                       d_model: int = 128, n_heads: int = 4, n_layers: int = 1,
+                       d_ff: int = 512, train_fraction: float = 0.3):
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}
@@ -285,6 +287,11 @@ def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
             condition_name=name,
             output_dir=output_dir,
             max_steps=max_steps,
+            d_model=d_model,
+            n_heads=n_heads,
+            n_layers=n_layers,
+            d_ff=d_ff,
+            train_fraction=train_fraction,
         )
         
         state = train(train_config)
@@ -315,10 +322,18 @@ if __name__ == "__main__":
     parser.add_argument("--all", action="store_true", help="Run all conditions")
     parser.add_argument("--max-steps", type=int, default=50000)
     parser.add_argument("--output-dir", type=str, default="results")
+    parser.add_argument("--d-model", type=int, default=128, help="Model width")
+    parser.add_argument("--n-heads", type=int, default=4, help="Number of attention heads")
+    parser.add_argument("--n-layers", type=int, default=1, help="Number of layers")
+    parser.add_argument("--d-ff", type=int, default=512, help="Feedforward dimension")
+    parser.add_argument("--train-fraction", type=float, default=0.3, help="Fraction of data for training")
     args = parser.parse_args()
     
     if args.all:
-        run_all_conditions(args.output_dir, args.max_steps)
+        run_all_conditions(args.output_dir, args.max_steps,
+                           d_model=args.d_model, n_heads=args.n_heads,
+                           n_layers=args.n_layers, d_ff=args.d_ff,
+                           train_fraction=args.train_fraction)
     elif args.condition:
         conditions = get_all_conditions()
         # Match partial names
@@ -335,6 +350,11 @@ if __name__ == "__main__":
                 condition_name=matched,
                 output_dir=args.output_dir,
                 max_steps=args.max_steps,
+                d_model=args.d_model,
+                n_heads=args.n_heads,
+                n_layers=args.n_layers,
+                d_ff=args.d_ff,
+                train_fraction=args.train_fraction,
             )
             train(train_config)
         else:
@@ -342,5 +362,14 @@ if __name__ == "__main__":
             print(f"Available: {list(conditions.keys())}")
     else:
         # Default: run pure condition
-        train_config = TrainConfig(condition_name="pure", output_dir=args.output_dir)
+        train_config = TrainConfig(
+            condition_name="pure",
+            output_dir=args.output_dir,
+            max_steps=args.max_steps,
+            d_model=args.d_model,
+            n_heads=args.n_heads,
+            n_layers=args.n_layers,
+            d_ff=args.d_ff,
+            train_fraction=args.train_fraction,
+        )
         train(train_config)

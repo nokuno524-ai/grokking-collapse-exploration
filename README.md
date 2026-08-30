@@ -33,12 +33,31 @@ sbatch slurm/exp_c_grid.sbatch
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
 
-# Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
-    --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
-    --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
-    --output-dir analysis/transplant
+# Surgical transplant matrix
+python -m src.transplant.run_transplants \
+    --runs results/exp_c_grid/wd1/noise0/seed_42 \
+           results/exp_c_grid/wd1/noise0.05/seed_42 \
+           results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --output-dir analysis/transplant_matrix
+
+# Fractional ablation scaling (e.g. 10/25/50/75/100% of MLP neurons)
+python -m src.transplant.run_transplants \
+    --runs results/exp_c_grid/wd1/noise0/seed_42 \
+           results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --ablation-component mlp
 ```
+
+## Circuit transplant matrix
+
+A key mechanistic experiment is evaluating component interchangeability across different collapse severities. The **circuit transplant matrix** experiment automates this by systematically taking candidate components (attention heads, MLPs, embeddings, LayerNorms) from every given donor checkpoint and inserting them into every recipient checkpoint.
+
+The results are saved as a CSV (`donor_recipient_matrix.csv`) and visualized as heatmaps (`heatmap_zero_shot.png` and `heatmap_finetuned.png`).
+
+- **How to run:** Use `src.transplant.run_transplants` and pass multiple runs to `--runs`.
+- **Outputs:** Heatmaps with the recipient on the X-axis and donor on the Y-axis.
+- **Interpretation:** If pasting a component from a grokked donor into a collapsed recipient rescues generalization (accuracy jumps near 1.0 zero-shot, or after brief `--rescue-steps` finetuning), it indicates that component contains the crucial missing circuit.
+
+Additionally, an **ablation scaling mode** is available using `--ablation-component`. This patches only a fraction (10%, 25%, 50%, 75%, 100%) of the component to reveal whether the rescue effect is gradual (e.g., each head independently adds value) or all-or-nothing (requires a complete functional sub-network).
 
 ## Architecture
 

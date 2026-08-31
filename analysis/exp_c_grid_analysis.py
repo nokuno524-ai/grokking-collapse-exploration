@@ -250,27 +250,6 @@ def line_plot_by_wd(rows, wds, noises, metric, out_path, ylabel, title):
     plt.close(fig)
 
 
-def find_fourier_cliff(rows, wds, noises, threshold=0.20):
-    """
-    For each wd, return the smallest noise where mean fourier drops below threshold.
-    Threshold ~0.20 reflects the empirical clean-grokked range (~0.27).
-    """
-    cliff = {}
-    for wd in wds:
-        for noise in noises:
-            cell = [
-                r["final_fourier_concentration"] for r in rows
-                if math.isclose(r["wd"], wd) and math.isclose(r["noise"], noise)
-                and r["final_fourier_concentration"] is not None
-            ]
-            if not cell:
-                continue
-            mu = mean(cell)
-            if mu < threshold:
-                cliff[wd] = noise
-                break
-        cliff.setdefault(wd, None)
-    return cliff
 
 
 def plot_wd1_n015_trajectories(rows, out_path):
@@ -425,10 +404,15 @@ def write_summary_md(rows, agg, wds, noises, cliff, signatures, path):
     path.write_text("".join(lines))
 
 
+
+from grokkit.cliff import find_cliff as _fc
+def find_fourier_cliff(rows, wds, noises, threshold=0.20):
+    return _fc(rows, "wd", "noise", "final_fourier_concentration", threshold, "below")
+
 def write_csv(path, rows, fields):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
         w.writeheader()
         for r in rows:
             w.writerow({k: r.get(k) for k in fields})

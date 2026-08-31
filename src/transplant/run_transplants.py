@@ -76,9 +76,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
@@ -469,37 +469,24 @@ def plot_bar(results: List[VariantResult], out_path: Path) -> None:
     plt.close(fig)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--pure-run", type=Path, required=True,
-                    help="Path to a grokked run directory (contains checkpoint_*.pt + results.json).")
-    ap.add_argument("--contam-run", type=Path, required=True,
-                    help="Path to a failed-grokking run at the *same seed*.")
-    ap.add_argument("--pure-step", type=int, default=None,
-                    help="Which checkpoint step to use for pure (default: last).")
-    ap.add_argument("--contam-step", type=int, default=None,
-                    help="Which checkpoint step to use for contam (default: last).")
-    ap.add_argument("--components", type=str,
-                    default=",".join(DEFAULT_PATCH_COMPONENTS),
-                    help="Comma-separated components to patch.")
-    ap.add_argument("--rescue-steps", type=int, default=2000,
-                    help="Steps of post-patch retraining (0 to disable retrain row).")
-    ap.add_argument("--rescue-lr", type=float, default=1e-3)
-    ap.add_argument("--rescue-wd", type=float, default=None,
-                    help="Weight decay during rescue (default: contam-run's wd).")
-    ap.add_argument("--output-dir", type=Path,
-                    default=Path("analysis/transplant"),
-                    help="Where to save results.")
-    ap.add_argument("--seed", type=int, default=0,
-                    help="Seed for random-basis controls and rescue.")
-    args = ap.parse_args()
-
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+def run_transplant_experiment(
+    pure_run: Path,
+    contam_run: Path,
+    output_dir: Path,
+    components: List[str] = DEFAULT_PATCH_COMPONENTS,
+    pure_step: Optional[int] = None,
+    contam_step: Optional[int] = None,
+    rescue_steps: int = 2000,
+    rescue_lr: float = 1e-3,
+    rescue_wd: Optional[float] = None,
+    seed: int = 0,
+) -> List[VariantResult]:
+    output_dir.mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[info] device = {device}")
 
-    pure_sd, pure_cfg = load_run(args.pure_run, args.pure_step)
-    contam_sd, contam_cfg = load_run(args.contam_run, args.contam_step)
+    pure_sd, pure_cfg = load_run(pure_run, pure_step)
+    contam_sd, contam_cfg = load_run(contam_run, contam_step)
     print(f"[info] pure cfg: wd={pure_cfg.get('weight_decay')} "
           f"noise={pure_cfg.get('noise_fraction')} seed={pure_cfg.get('seed')}")
     print(f"[info] contam cfg: wd={contam_cfg.get('weight_decay')} "
@@ -514,12 +501,10 @@ def main():
                 f"vs contam={contam_cfg.get(fld)}"
             )
 
-    rescue_wd = args.rescue_wd
     if rescue_wd is None:
         rescue_wd = float(contam_cfg.get("weight_decay", 1.0))
 
-    rng = torch.Generator().manual_seed(args.seed)
-    components = [c.strip() for c in args.components.split(",") if c.strip()]
+    rng = torch.Generator().manual_seed(seed)
     for c in components:
         if c not in COMPONENT_PATTERNS:
             raise ValueError(f"unknown component {c!r}; valid: {list(COMPONENT_PATTERNS)}")
@@ -561,15 +546,15 @@ def main():
             cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
             device=device, rescue_steps=0,
         ))
-        if args.rescue_steps > 0:
+        if rescue_steps > 0:
             print(f"[run] transplant_{comp}+rt …")
             results.append(run_one_variant(
                 f"transplant_{comp}+rt", base_sd=contam_sd, donor_sd=pure_sd,
                 component=comp,
                 cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
-                device=device, rescue_steps=args.rescue_steps,
-                rescue_lr=args.rescue_lr, rescue_wd=rescue_wd,
-                rescue_seed=args.seed,
+                device=device, rescue_steps=rescue_steps,
+                rescue_lr=rescue_lr, rescue_wd=rescue_wd,
+                rescue_seed=seed,
             ))
         print(f"[run] rand_{comp} (zero-shot) …")
         results.append(run_one_variant(
@@ -578,30 +563,30 @@ def main():
             cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
             device=device, randomize=True, rng=rng, rescue_steps=0,
         ))
-        if args.rescue_steps > 0:
+        if rescue_steps > 0:
             print(f"[run] rand_{comp}+rt …")
             results.append(run_one_variant(
                 f"rand_{comp}+rt", base_sd=contam_sd, donor_sd=None,
                 component=comp,
                 cfg_for_loaders=contam_cfg, cfg_for_model=contam_cfg,
                 device=device, randomize=True, rng=rng,
-                rescue_steps=args.rescue_steps,
-                rescue_lr=args.rescue_lr, rescue_wd=rescue_wd,
-                rescue_seed=args.seed,
+                rescue_steps=rescue_steps,
+                rescue_lr=rescue_lr, rescue_wd=rescue_wd,
+                rescue_seed=seed,
             ))
 
     # Persist
-    json_path = args.output_dir / "rescue_results.json"
+    json_path = output_dir / "rescue_results.json"
     with json_path.open("w") as f:
         json.dump({
-            "pure_run": str(args.pure_run),
-            "contam_run": str(args.contam_run),
+            "pure_run": str(pure_run),
+            "contam_run": str(contam_run),
             "pure_cfg": pure_cfg,
             "contam_cfg": contam_cfg,
-            "rescue_steps": args.rescue_steps,
-            "rescue_lr": args.rescue_lr,
+            "rescue_steps": rescue_steps,
+            "rescue_lr": rescue_lr,
             "rescue_wd": rescue_wd,
-            "seed": args.seed,
+            "seed": seed,
             "pure_basis": pure_basis,
             "contam_basis": contam_basis,
             "variants": [asdict(r) for r in results],
@@ -610,12 +595,12 @@ def main():
 
     write_summary_md(
         results, pure_basis, contam_basis, pure_cfg, contam_cfg,
-        args.output_dir / "rescue_summary.md",
+        output_dir / "rescue_summary.md",
     )
-    print(f"[done] wrote {args.output_dir/'rescue_summary.md'}")
+    print(f"[done] wrote {output_dir/'rescue_summary.md'}")
 
-    plot_bar(results, args.output_dir / "rescue_bar.png")
-    print(f"[done] wrote {args.output_dir/'rescue_bar.png'}")
+    plot_bar(results, output_dir / "rescue_bar.png")
+    print(f"[done] wrote {output_dir/'rescue_bar.png'}")
 
     # Console summary
     print("\n=== SUMMARY ===")
@@ -623,6 +608,47 @@ def main():
         rt = f"+rt({r.rescue_steps})" if r.rescue_steps else ""
         print(f"  {r.name:30s} {rt:10s} test_acc={r.test_acc:.3f} fc={r.fourier_concentration:.3f}")
 
+    return results
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pure-run", type=Path, required=True,
+                    help="Path to a grokked run directory (contains checkpoint_*.pt + results.json).")
+    ap.add_argument("--contam-run", type=Path, required=True,
+                    help="Path to a failed-grokking run at the *same seed*.")
+    ap.add_argument("--pure-step", type=int, default=None,
+                    help="Which checkpoint step to use for pure (default: last).")
+    ap.add_argument("--contam-step", type=int, default=None,
+                    help="Which checkpoint step to use for contam (default: last).")
+    ap.add_argument("--components", type=str,
+                    default=",".join(DEFAULT_PATCH_COMPONENTS),
+                    help="Comma-separated components to patch.")
+    ap.add_argument("--rescue-steps", type=int, default=2000,
+                    help="Steps of post-patch retraining (0 to disable retrain row).")
+    ap.add_argument("--rescue-lr", type=float, default=1e-3)
+    ap.add_argument("--rescue-wd", type=float, default=None,
+                    help="Weight decay during rescue (default: contam-run's wd).")
+    ap.add_argument("--output-dir", type=Path,
+                    default=Path("analysis/transplant"),
+                    help="Where to save results.")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="Seed for random-basis controls and rescue.")
+    args = ap.parse_args()
+
+    components = [c.strip() for c in args.components.split(",") if c.strip()]
+
+    run_transplant_experiment(
+        pure_run=args.pure_run,
+        contam_run=args.contam_run,
+        output_dir=args.output_dir,
+        components=components,
+        pure_step=args.pure_step,
+        contam_step=args.contam_step,
+        rescue_steps=args.rescue_steps,
+        rescue_lr=args.rescue_lr,
+        rescue_wd=args.rescue_wd,
+        seed=args.seed
+    )
 
 if __name__ == "__main__":
     main()

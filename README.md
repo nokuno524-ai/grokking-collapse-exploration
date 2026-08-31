@@ -40,6 +40,19 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+
+## Curriculum experiments
+
+You can run the full curriculum experiment matrix (which evaluates constant data-mixing versus linear/cosine/step dynamic schedules for model collapse vs pure grokking recovery) using the following commands:
+
+```bash
+# Run the small, CPU-optimized experiment matrix for curriculum models
+python src/run_curriculum.py --output-dir results/curriculum --max-steps 15000 --seeds 1
+
+# Analyze findings and hypothesize on mechanistic irreversibility of collapsed data
+python src/analysis/curriculum_analysis.py --results-dir results/curriculum
+```
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

@@ -34,10 +34,17 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python src/transplant/run_transplants.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Cross-seed replication harness (after multi-seed baselines are run)
+python -m src.transplant.replication_harness \
+    --seeds 42,43,44,45,46 \
+    --conditions low_collapse,medium_collapse,high_collapse,severe_collapse \
+    --results-dir results/multi_seed \
+    --output-dir analysis/transplant_replication
 ```
 
 ## Architecture

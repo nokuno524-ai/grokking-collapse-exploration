@@ -11,16 +11,23 @@ import time
 import os
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from typing import Optional, List
+from typing import Optional, List, Tuple
+
 
 try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
     from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .curriculum.schedules import get_schedule
+    from .curriculum.mixer import generate_curriculum_batch
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
     from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from curriculum.schedules import get_schedule
+    from curriculum.mixer import generate_curriculum_batch
+    from curriculum.schedules import get_schedule
+    from curriculum.mixer import generate_curriculum_batch
 
 
 @dataclass
@@ -48,6 +55,12 @@ class TrainConfig:
     collapse_level: float = 0.0
     collapse_severity: float = 0.5
     train_fraction: float = 0.3
+
+    # Curriculum
+    curriculum_schedule: Optional[str] = None  # None, 'constant', 'linear', 'cosine', 'step'
+    curriculum_start_w: float = 1.0  # Weight of collapsed data at step 0
+    curriculum_end_w: float = 0.0    # Weight of collapsed data at max_steps
+
     noise_fraction: float = 0.0
     seed: int = 42
     
@@ -119,28 +132,69 @@ def train(config: TrainConfig) -> TrainState:
     # Set seeds
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
+    import numpy as np
+    rng = np.random.RandomState(config.seed)
 
-    # Generate data
-    data_config = DatasetConfig(
-        prime=config.prime,
-        train_fraction=config.train_fraction,
-        collapse_level=config.collapse_level,
-        collapse_severity=config.collapse_severity,
-        noise_fraction=config.noise_fraction,
-        seed=config.seed,
-    )
-    train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
-    
-    train_dataset = TensorDataset(train_in, train_tgt)
-    test_dataset = TensorDataset(test_in, test_tgt)
+    if config.curriculum_schedule is not None:
+        # Curriculum mode: Generate pure dataset and fully collapsed dataset
+        clean_config = DatasetConfig(
+            prime=config.prime,
+            train_fraction=config.train_fraction,
+            collapse_level=0.0,
+            collapse_severity=0.0,
+            noise_fraction=config.noise_fraction,
+            seed=config.seed,
+        )
+        clean_train_in, clean_train_tgt, test_in, test_tgt = generate_modular_arithmetic(clean_config)
 
-    loader_generator = torch.Generator()
-    loader_generator.manual_seed(config.seed)
-    train_loader = DataLoader(
-        train_dataset, batch_size=config.batch_size, shuffle=True,
-        generator=loader_generator,
-    )
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+        collapse_config = DatasetConfig(
+            prime=config.prime,
+            train_fraction=config.train_fraction,
+            collapse_level=1.0,
+            collapse_severity=config.collapse_severity,
+            noise_fraction=config.noise_fraction,
+            seed=config.seed,
+        )
+        collapse_train_in, collapse_train_tgt, _, _ = generate_modular_arithmetic(collapse_config)
+
+        test_dataset = TensorDataset(test_in, test_tgt)
+        test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+
+        schedule_fn = get_schedule(
+            config.curriculum_schedule,
+            config.curriculum_start_w,
+            config.curriculum_end_w,
+            config.max_steps
+        )
+        train_loader = None
+        dataloader_iter = None
+
+        # Use clean train set for evaluation
+        eval_dataset = TensorDataset(clean_train_in, clean_train_tgt)
+        eval_loader = DataLoader(eval_dataset, batch_size=config.batch_size, shuffle=False)
+    else:
+        # Standard mode
+        data_config = DatasetConfig(
+            prime=config.prime,
+            train_fraction=config.train_fraction,
+            collapse_level=config.collapse_level,
+            collapse_severity=config.collapse_severity,
+            noise_fraction=config.noise_fraction,
+            seed=config.seed,
+        )
+        train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
+
+        train_dataset = TensorDataset(train_in, train_tgt)
+        test_dataset = TensorDataset(test_in, test_tgt)
+
+        loader_generator = torch.Generator()
+        loader_generator.manual_seed(config.seed)
+        train_loader = DataLoader(
+            train_dataset, batch_size=config.batch_size, shuffle=True,
+            generator=loader_generator,
+        )
+        test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+        dataloader_iter = iter(train_loader)
     
     # Create model
     model = ModularArithmeticTransformer(
@@ -166,18 +220,25 @@ def train(config: TrainConfig) -> TrainState:
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Training loop
-    dataloader_iter = iter(train_loader)
     start_time = time.time()
     
     for step in range(1, config.max_steps + 1):
         model.train()
         
         # Get batch
-        try:
-            inputs, targets = next(dataloader_iter)
-        except StopIteration:
-            dataloader_iter = iter(train_loader)
-            inputs, targets = next(dataloader_iter)
+        if config.curriculum_schedule is not None:
+            w = schedule_fn(step)
+            inputs, targets = generate_curriculum_batch(
+                clean_train_in, clean_train_tgt,
+                collapse_train_in, collapse_train_tgt,
+                config.batch_size, w, rng
+            )
+        else:
+            try:
+                inputs, targets = next(dataloader_iter)
+            except StopIteration:
+                dataloader_iter = iter(train_loader)
+                inputs, targets = next(dataloader_iter)
         
         inputs, targets = inputs.to(device), targets.to(device)
         
@@ -195,7 +256,10 @@ def train(config: TrainConfig) -> TrainState:
         
         # Evaluate periodically
         if step % config.eval_every == 0:
-            train_loss, train_acc = evaluate(model, train_loader, device)
+            if config.curriculum_schedule is not None:
+                train_loss, train_acc = evaluate(model, eval_loader, device)
+            else:
+                train_loss, train_acc = evaluate(model, train_loader, device)
             test_loss, test_acc = evaluate(model, test_loader, device)
             
             state.train_loss = train_loss

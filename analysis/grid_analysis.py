@@ -84,6 +84,15 @@ def collect_runs():
     return rows
 
 
+from grokkit.parser import collect_runs as _cr
+def collect_runs():
+    rows = _cr(GRID_ROOT)
+    # alias keys for legacy scripts
+    for r in rows:
+        if "collapse_level" in r: r["level"] = r["collapse_level"]
+        if "collapse_severity" in r: r["severity"] = r["collapse_severity"]
+    return rows
+
 def write_csv(rows, path):
     cols = [
         "level",
@@ -98,7 +107,7 @@ def write_csv(rows, path):
         "final_embedding_rank",
     ]
     with path.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=cols)
+        w = csv.DictWriter(f, fieldnames=cols, extrasaction='ignore')
         w.writeheader()
         for r in rows:
             w.writerow(r)

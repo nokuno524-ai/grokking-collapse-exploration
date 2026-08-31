@@ -82,3 +82,18 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+
+## Analysis & Grokkit CLI
+
+This repository contains a dedicated package, `grokkit`, for reproducibly converting raw experiment logs into standard reports, tables, and figures.
+
+You can run the CLI via:
+
+```bash
+grokkit analyze <run_dir>
+grokkit compare <dirs...>
+grokkit cliff <run_dir>
+```
+
+For detailed usage, see [docs/USAGE.md](docs/USAGE.md).

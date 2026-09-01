@@ -34,10 +34,29 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
-    --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
-    --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
+python -m src.transplant.run_transplants \
+    --pure-dirs results/exp_c_grid/wd1/noise0/seed_42 \
+    --severe-dirs results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+```
+
+## Circuit transplant (Experiment A)
+
+To interpret what goes missing when a model fails to grok under collapse, we perform surgical transplants of circuit components (attention heads, linear layers, embeddings) between checkpoints.
+
+The unified transplant harness runs an experiment matrix across:
+- **Directions:** pure -> severe (rescue), severe -> pure (sabotage)
+- **Controls:** real transplants vs. random-basis transplants vs. shuffled-head transplants.
+- **Checkpoints:** evaluated at early, transitioning, and post-grokking steps.
+- **Aggregations:** Results across multiple seeds are output with bootstrap confidence intervals and Cohen's d effect sizes.
+
+```bash
+# CPU demo for the transplant harness
+python -m src.transplant.run_transplants \
+    --pure-dirs path/to/pure/seed1 path/to/pure/seed2 \
+    --severe-dirs path/to/severe/seed1 path/to/severe/seed2 \
+    --components token_embed layer0_attn layer0_mlp \
+    --output-dir analysis/transplant_demo
 ```
 
 ## Architecture

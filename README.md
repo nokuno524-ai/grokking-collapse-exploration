@@ -40,6 +40,17 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Attention Visualization
+
+This repository includes a suite of tools for visualizing where the collapse-vs-grokking difference lives within the network's attention patterns.
+
+1. **Extraction**: Run `python scripts/extract_attention.py --checkpoint-dir <path> --probe-data <path>` to capture per-layer, per-head attention maps for probe inputs. Outputs `.npz` files.
+2. **Visualization**: Run `python scripts/visualize_attention.py --maps-dir <path>` to generate publication-quality figures:
+   - **Attention Entropy (Line Plot)**: Shows mean attention entropy across checkpoints. Lower entropy typically signals model collapse.
+   - **Head Specialization (Heatmap)**: Displays a clustering of heads by attention-matrix similarity.
+   - **Diagnostic Token Traces**: Traces attention weights directed to task-relevant sequence positions over training time.
+3. **Comparative Analysis**: Run `python scripts/compare_attention.py --pure-dir <path> --collapsed-dir <path>` to generate a markdown report quantifying divergence (entropy deltas, cluster-membership flips).
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

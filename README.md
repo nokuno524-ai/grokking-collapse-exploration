@@ -82,3 +82,17 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Statistical analysis
+
+The project features a dedicated statistical analysis pipeline to quantify the effects of model collapse severity on grokking. The analysis fits a logistic growth model (a smooth curve, $y = \text{bottom} + \frac{\text{top} - \text{bottom}}{1 + e^{-k(x - x_0)}}$) to accuracy-vs-step trajectories to robustly extract:
+- **Grokking Step:** The 50% crossing of the transition phase ($x_0$).
+- **Cliff Width:** The step window comprising the 10% to 90% transition region ($2 \ln(9) / k$).
+- **Asymptotic Accuracy:** The final performance level achieved ($\text{top}$).
+
+We aggregate these metrics across random seeds, computing means and 95% confidence intervals to measure effect stability. The pipeline utilizes non-parametric permutation tests to strictly evaluate the hypothesis that collapse severity systematically delays or eliminates the grokking cliff, measuring effect sizes (Cohen's d). A Spearman rank correlation is further used to measure monotonic trends across ordinal severity categories.
+
+To regenerate the statistical analysis report (`analysis/statistical_report.md`):
+```bash
+python -m src.analysis.report
+```

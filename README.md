@@ -40,6 +40,24 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Weight Averaging
+
+We evaluate if models can traverse the grokking cliff by interpolating their weights. This tests the hypothesis that pre-grok and post-grok networks reside in different geometric basins with a barrier, or if the transition is smooth.
+
+To run interpolation across checkpoints:
+```bash
+python -m src.averaging.run_averaging \
+    --conditions pure low_collapse medium_collapse severe_collapse \
+    --pre-step 5000 \
+    --post-step 50000 \
+    --num-alphas 11 \
+    --out-path analysis/averaging_results.json
+
+python src/averaging/plot_averaging.py --results-file analysis/averaging_results.json
+```
+**Interpretation:** A smooth bridge supports simple refinement; a barrier supports severe mechanistic shifts. Caveat: Averaging models in incompatible basins yields poor performance (linear mode connectivity).
+**Format:** Expects checkpoint files (e.g. `checkpoint_5000.pt`) to contain at least a `"model_state"` key with a weight dictionary.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

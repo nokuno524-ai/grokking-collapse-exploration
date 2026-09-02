@@ -82,3 +82,36 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Early warning signals
+
+Can we predict whether a model will grok long before the grokking cliff in test accuracy occurs?
+The early warning signals module (`src/analysis/early_warning`) investigates this by extracting precursor signals from training logs up to a specific step.
+
+### Log Format Expected
+The module ingests training logs structured as lists of dictionaries (e.g. the `history` array in `results.json`). Each entry must contain at least:
+- `step`: The training step (integer).
+- `train_loss`: The loss on the training set (float).
+- `test_acc`: The accuracy on the validation/test set (float).
+- `weight_norm`: The norm of the model weights (float).
+
+Optionally, logs can include `grad_norm` for gradient statistics.
+
+### Precursor Signals
+The following signals are computed over a rolling window leading up to the evaluation step:
+1. **Train loss plateau slope**: The slope of the linear fit to the recent training loss curve.
+2. **Weight norm derivative**: The slope of the linear fit to the recent weight norm curve.
+3. **Gradient norm statistics**: Mean and variance of the gradient norm (if available).
+4. **Test accuracy variance & autocorrelation**: Variance and lag-1 autocorrelation of the test accuracy curve.
+5. **Delayed generalization score**: A composite score inspired by critical transitions literature (`variance * max(0, autocorrelation)`), which identifies rising variance and rising autocorrelation before a bifurcation.
+
+### Running the Predictor
+To run the prediction experiments across all multi-seed runs, executing LOOCV logistic regression for will-it-grok and linear regression for when-it-groks:
+```bash
+python -m src.analysis.early_warning.predictor
+```
+This will generate `grokking_early_warning.md` and boxplots for each fraction in `analysis/early_warning/`.
+
+### Caveats
+- These early warning signals are strictly correlational. They identify *markers* that precede grokking under these specific training setups (e.g. modular arithmetic, fixed learning rate), but do not imply a causal mechanism.
+- The sample size of runs (n=25 across the multi-seed directory) is extremely small. The 100% predictive accuracies achieved at early fractions should be interpreted cautiously and may not generalize broadly outside of this narrow experimental setup.

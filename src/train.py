@@ -269,7 +269,7 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> dict:
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}

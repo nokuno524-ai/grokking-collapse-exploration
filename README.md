@@ -40,6 +40,34 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Phase diagram
+
+To characterize the boundary at which grokking breaks down, we run a parameter sweep varying the model scale (d_model), the dataset size (train_fraction), and the contamination fraction (collapse_level).
+
+The grid sweeps:
+- `collapse_level` ∈ {0, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0}
+- `train_fraction` ∈ {0.2, 0.3, 0.5, 0.8}
+- `d_model` ∈ {32, 64, 128}
+
+**Running the Sweep**
+Locally (CPU smoke testing):
+```bash
+python -m src.sweep.driver --array-id 0
+```
+
+On Rivanna (via SLURM array):
+```bash
+python -m src.sweep.driver --emit-sbatch
+sbatch slurm/phase_diagram.sbatch
+```
+
+**Output interpretation**
+After running, aggregate the results using:
+```bash
+python -m src.analysis.phase_diagram
+```
+This produces `grokking_phase_diagram.md` and associated PNG plots outlining the Grokking Step vs Contamination Fraction. Models that hit a noisy plateau and fail to converge past a 0.95 accuracy threshold are classified as 'Never Grok'.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

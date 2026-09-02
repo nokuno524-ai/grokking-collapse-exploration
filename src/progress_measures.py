@@ -169,12 +169,15 @@ def analyze_grokking_trajectory(history: List[Dict]) -> Dict:
     circuit_onset = None
     window = 5
     for i in range(window, len(history) + 1):
+        if i > len(history):
+            break
         recent = [history[j].get("fourier_concentration", 0) for j in range(i - window, i)]
         running_mean = sum(recent) / window
-        monotonic = all(recent[k] <= recent[k + 1] for k in range(window - 1))
-        if running_mean > 0.1 and monotonic:
-            circuit_onset = history[i - 1]["step"]
-            break
+        if len(recent) == window:
+            monotonic = all(recent[k] <= recent[k + 1] for k in range(window - 1))
+            if running_mean > 0.1 and monotonic:
+                circuit_onset = history[i - 1]["step"]
+                break
     
     # Compute key metrics
     max_weight_norm = max(e.get("weight_norm", 0) for e in history) if history else 0

@@ -1,0 +1,3 @@
+# Phase Diagram Scaling Characterization
+
+To characterize grokking boundaries comprehensively...

@@ -82,3 +82,29 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Circuit Transplant Sweep Methodology
+The project explores mechanistic phenomena linking Grokking and Model Collapse using a *circuit transplantation* methodology. Using pairs of neural networks trained with the exact same initializations and random seeds (ensuring identically partitioned data), we evaluate whether individual functional components isolated from a fully grokked (pure data) network can rescue generalization when patched into a collapsed network.
+
+Components investigated:
+* **Attention Heads:** Substituted via slice-mapping QKV inputs and Output projections.
+* **MLPs (Feedforward blocks):** Linear mappings per transformer layer.
+* **LayerNorm parameters.**
+
+To run a transplant matrix encompassing all model layers, heads, MLPs and LN modules across distinct model-collapse settings:
+
+```bash
+# E.g. using three baseline sweep configurations for comparison
+python -m src.transplant.run_transplants \
+    --pure-dirs results/pure/seed_1 results/pure/seed_2 \
+    --low-dirs results/low/seed_1 results/low/seed_2 \
+    --severe-dirs results/severe/seed_1 results/severe/seed_2 \
+    --output-dir analysis/transplant_matrix
+
+# Then aggregate findings to compute Cohen's d effect sizes, Bootstrap CIs,
+# and render head-benefit heatmaps and markdown statistical reports:
+python -m src.transplant.plot_replication \
+    --input-csv analysis/transplant_matrix/transplant_raw.csv \
+    --output-dir analysis/transplant_matrix
+```
+The analysis pipeline detects specific subsets, checking for features known to emerge during grokking (e.g. constant attention heads). Results are output into markdown format and seaborn heatmaps (found under `analysis/`).

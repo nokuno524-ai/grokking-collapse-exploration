@@ -82,3 +82,24 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Rigor and Reproducibility: Multi-Seed Survival Analysis
+
+To rigorously test the grokking cliffs and address seed sensitivity:
+
+1. **Grokking Changepoint Detection**:
+   We implemented `piecewise_linear_detector` and `cusum_detector` to robustly identify the exact step where validation accuracy escapes the chance level.
+
+2. **Survival Analysis**:
+   Since severe collapse configurations may never grok within the computational budget, we treat non-grokking as right-censored data. We provide Kaplan-Meier estimator plots to quantify the probability of grokking over time.
+
+3. **To Reproduce**:
+   Run the fast multi-seed driver (uses a smaller proxy model to fit in CPU boundaries quickly, or you can adjust sizes for GPUs):
+   ```bash
+   python src/run_multi_seed_stats.py --n-seeds 10 --max-steps 10000 --workers 4
+   ```
+   Generate the statistical report, including Cohen's d power analysis and survival plots:
+   ```bash
+   python src/analysis/report.py --input-file results/multi_seed_stats.jsonl --max-steps 10000
+   ```
+   The final report and plots will be placed in `analysis/multi_seed/`.

@@ -38,6 +38,13 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Visualize Attention Patterns and Differences
+python scripts/visualize_attention.py \
+    --checkpoints results/pure/checkpoint_50000.pt results/severe_collapse/checkpoint_50000.pt \
+    --names Pure Collapsed \
+    --compare \
+    --output-dir results/attention_viz
 ```
 
 ## Architecture
@@ -64,9 +71,14 @@ src/
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)
   causal_circuit_rescue.py # observational per-matrix rank trajectory
   progress_measures.py     # Chan-style progress measures, leading-indicator variant
-  analysis.py              # per-condition plot/table generation
+  analysis_legacy.py       # per-condition plot/table generation
+  analysis/attention.py    # quantitative analysis of attention heads (entropy, similarity)
+  viz/attention.py         # matplotlib visualizations of attention heatmaps
   contamination/           # toy contamination experiment
   contamination_real/      # GPT-2 medium + LoRA on contaminated OWT (Exp B)
+
+scripts/                   # CLI tools
+  visualize_attention.py   # orchestrated attention plotting, metrics, and markdown generation
 
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries

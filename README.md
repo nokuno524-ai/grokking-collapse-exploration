@@ -82,3 +82,13 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## New Changepoint Detection and Statistical Tools
+
+We added robust changepoint detection (piecewise-constant fit and logistic max-slope detectors with bootstrap CIs) and multi-seed statistical tools (Kaplan-Meier survival analysis for censored non-grokking runs) to quantify uncertainty.
+
+Run the multi-seed analysis over existing grid logs to produce the statistical markdown report:
+```bash
+python -m src.analysis.report results/seed_sweep
+```
+Results will be generated in `analysis/multi_seed/`.

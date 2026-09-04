@@ -76,13 +76,21 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
-    from model import ModularArithmeticTransformer  # type: ignore
-    from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
-    from train import compute_fourier_concentration, evaluate  # type: ignore
+    try:
+        from model import ModularArithmeticTransformer  # type: ignore
+        from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
+        from train import compute_fourier_concentration, evaluate  # type: ignore
+    except ImportError:
+        import sys
+        from pathlib import Path
+        sys.path.append(str(Path(__file__).parent.parent))
+        from model import ModularArithmeticTransformer  # type: ignore
+        from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
+        from train import compute_fourier_concentration, evaluate  # type: ignore
 
 
 # Mapping from a short component name to the regex of state_dict keys it covers.

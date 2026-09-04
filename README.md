@@ -34,10 +34,16 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python -m src.transplant.transplant_rescue \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Head-level transplant analysis
+python -m src.transplant.head_transplant \
+    --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
+    --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --output-dir analysis/head_transplant
 ```
 
 ## Architecture
@@ -60,7 +66,9 @@ src/
   run_scarcity_baseline.py # train-fraction baseline
   run_multi_seed.py        # 5-seed × 5-condition repeat
   run_prime_sweep.py       # second-prime brittleness check (NEW)
-  transplant_rescue.py     # surgical-circuit transplant (Exp A, NEW)
+  transplant/              # circuit transplants and attribution logic
+    transplant_rescue.py     # surgical-circuit transplant (Exp A, NEW)
+    head_transplant.py       # head-level attribution and greedy search
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)
   causal_circuit_rescue.py # observational per-matrix rank trajectory
   progress_measures.py     # Chan-style progress measures, leading-indicator variant

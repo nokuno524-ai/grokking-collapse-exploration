@@ -33,6 +33,13 @@ sbatch slurm/exp_c_grid.sbatch
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
 
+# Run multi-seed statistical analysis (CLI)
+python src/run_multi_seed_stats.py --seeds 42,43,44 --max-steps 50000 --jobs 3
+
+# Generate full statistical report and charts (Markdown + PNG)
+python src/analysis/report.py --results-dir results/multi_seed --output-dir analysis/multi_seed
+
+
 # Surgical transplant rescue (after Experiment A is run)
 python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
@@ -59,6 +66,10 @@ src/
   run_noise_baseline.py    # uniform-label-noise baseline
   run_scarcity_baseline.py # train-fraction baseline
   run_multi_seed.py        # 5-seed × 5-condition repeat
+  run_multi_seed_stats.py  # multi-seed experiment runner with parallelization
+  analysis/
+    report.py              # markdown report generator with survival stats
+    grok_detector/stats.py # robust cliff detection & kaplan-meier survival stats
   run_prime_sweep.py       # second-prime brittleness check (NEW)
   transplant_rescue.py     # surgical-circuit transplant (Exp A, NEW)
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)

@@ -82,3 +82,21 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+### Surgical Circuit Transplantation
+You can perform fine-grained circuit transplantation (head-wise, layer-wise, or arbitrary hybrid combinations) to identify the specific weights responsible for grokking. It evaluates zero-shot test accuracy after the transplant.
+```bash
+python -m src.transplant.head_transplant \
+    --base-dirs results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --donor-dirs results/exp_c_grid/wd1/noise0/seed_42 \
+    --output-dir analysis/head_transplant \
+    --hybrid-components "head_0_0,mlp_0"
+```
+To run an ablation control (replacing the components with a random orthogonal basis):
+```bash
+python -m src.transplant.head_transplant \
+    --base-dirs results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --ablate \
+    --output-dir analysis/head_ablation \
+    --hybrid-components "head_0_0"
+```

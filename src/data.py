@@ -18,6 +18,7 @@ class DatasetConfig:
     collapse_level: float = 0.0  # Fraction of training data replaced by synthetic
     collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
     noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
+    tree_depth: int = 1  # How many generations of recursive synthesis (partial-collapse regeneration trees)
     seed: int = 42
 
 
@@ -52,7 +53,8 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     if config.collapse_level > 0:
         train_pairs, train_targets_list = apply_collapse(
             train_pairs, train_targets_list, p,
-            config.collapse_level, config.collapse_severity, rng
+            config.collapse_level, config.collapse_severity, rng,
+            config.tree_depth
         )
 
     # Apply uniform random label noise (baseline ablation, mutually independent of collapse)
@@ -73,7 +75,8 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
 
 def apply_collapse(
     pairs: list, targets: list, prime: int,
-    collapse_level: float, collapse_severity: float, rng: np.random.RandomState
+    collapse_level: float, collapse_severity: float, rng: np.random.RandomState,
+    tree_depth: int = 1,
 ) -> Tuple[list, list]:
     """
     Simulate model collapse by replacing some targets with outputs from a "collapsed" model.
@@ -86,38 +89,49 @@ def apply_collapse(
     n_replace = int(len(targets) * collapse_level)
     replace_idx = rng.choice(len(targets), n_replace, replace=False)
     
-    # Compute target frequency distribution
-    from collections import Counter
-    target_counts = Counter(targets)
-    total = len(targets)
-    freq = {t: c / total for t, c in target_counts.items()}
+    # Base targets before any generations
+    current_targets = list(targets)
     
-    # Create collapsed distribution: amplify common targets, suppress rare ones
-    # Use temperature to control severity
-    temp = max(0.1, 1.0 - collapse_severity)
-    collapsed_probs = {}
-    for t in range(prime):
-        base_prob = freq.get(t, 1.0 / prime)
-        collapsed_probs[t] = base_prob ** (1.0 / temp)
-    
-    # Normalize
-    total_prob = sum(collapsed_probs.values())
-    collapsed_probs = {t: p / total_prob for t, p in collapsed_probs.items()}
-    
-    # Sample from collapsed distribution
-    collapsed_targets = list(collapsed_probs.keys())
-    collapsed_weights = [collapsed_probs[t] for t in collapsed_targets]
-    
+    for generation in range(tree_depth):
+        # Compute target frequency distribution of the CURRENT generation
+        from collections import Counter
+        target_counts = Counter(current_targets)
+        total = len(current_targets)
+        freq = {t: c / total for t, c in target_counts.items()}
+
+        # Create collapsed distribution: amplify common targets, suppress rare ones
+        # Use temperature to control severity
+        temp = max(0.1, 1.0 - collapse_severity)
+        collapsed_probs = {}
+        for t in range(prime):
+            base_prob = freq.get(t, 1.0 / prime)
+            collapsed_probs[t] = base_prob ** (1.0 / temp)
+
+        # Normalize
+        total_prob = sum(collapsed_probs.values())
+        collapsed_probs = {t: p / total_prob for t, p in collapsed_probs.items()}
+
+        # Sample from collapsed distribution to create the next generation of targets
+        collapsed_target_keys = list(collapsed_probs.keys())
+        collapsed_weights = [collapsed_probs[t] for t in collapsed_target_keys]
+
+        next_generation_targets = []
+        for _ in range(len(current_targets)):
+            next_target = rng.choice(collapsed_target_keys, p=collapsed_weights)
+            next_generation_targets.append(int(next_target))
+
+        current_targets = next_generation_targets
+
     new_pairs = list(pairs)
     new_targets = list(targets)
     
-    for idx in replace_idx:
-        # Replace target with sample from collapsed distribution
-        new_target = rng.choice(collapsed_targets, p=collapsed_weights)
-        new_targets[idx] = int(new_target)
-        # Optionally also corrupt the pair (simulating input collapse)
-        # For now, keep inputs clean — only corrupt outputs
-    
+    for i, idx in enumerate(replace_idx):
+        # We replace with a sample from the generated distribution,
+        # but to keep it simple and consistent with length, we just pull from
+        # the current_targets array. Since the array is sampled iid from the distribution,
+        # this is perfectly equivalent to sampling directly from the collapsed distribution.
+        new_targets[idx] = current_targets[idx]
+
     return new_pairs, new_targets
 
 

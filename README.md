@@ -38,6 +38,11 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Curriculum Rescue Experiment (New: tests if phasing out synthetic data rescues grokking)
+# Runs a sweep over the switch step where the dataset shifts from collapsed to fresh.
+python src/run_curriculum.py --sweep-step --output-dir results/curriculum_rescue
+python src/analysis/curriculum_analysis.py --results-dir results/curriculum_rescue --output analysis/curriculum_report.md
 ```
 
 ## Architecture
@@ -67,6 +72,9 @@ src/
   analysis.py              # per-condition plot/table generation
   contamination/           # toy contamination experiment
   contamination_real/      # GPT-2 medium + LoRA on contaminated OWT (Exp B)
+  curriculum/              # Curriculum data mixing logic (schedules & data mixer)
+  run_curriculum.py        # Curriculum rescue runner (switching data distribution)
+  analysis/curriculum_analysis.py # Tools to generate report from curriculum runs
 
 slurm/                     # one .sbatch per experiment block
 analysis/                  # generated tables, plots, markdown summaries

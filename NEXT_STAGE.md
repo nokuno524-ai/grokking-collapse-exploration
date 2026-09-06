@@ -24,7 +24,7 @@ preliminary evidence the rescue works or we know it doesn't and pivot.
 - [x] `README.md` — drop "collapse vs noise" framing, anchor on "label-noise
   cliff + scarcity dissociation". Done.
 - [x] `CLAUDE.md` — update project instructions to reflect the audit. Done.
-- [x] `src/transplant_rescue.py` — real surgical patch + retrain + random
+- [x] `src/transplant/transplant_rescue.py` — real surgical patch + retrain + random
   control, paired-seed. Done.
 - [x] `src/threshold_theory.py` — explicit derivation of η*(λ, p, d) and
   empirical fit on the existing `results/exp_c_grid/`. Done.

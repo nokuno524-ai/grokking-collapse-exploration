@@ -22,7 +22,7 @@ Three robust empirical claims (5 seeds each, results in `analysis/exp_c_grid_sum
 |---|---|---|
 | C empirical | 3×6×5 wd × noise × seed grid | done — 90 runs in `results/exp_c_grid/` |
 | C theory | Closed-form η*(λ, p, d) + empirical fit | new code added (`src/threshold_theory.py`); needs 1 day analyst time |
-| A | Surgical-circuit transplant rescue | new code added (`src/transplant_rescue.py`); not yet run |
+| A | Surgical-circuit transplant rescue | new code added (`src/transplant/transplant_rescue.py`); not yet run |
 | B | GPT-2 medium + LoRA on contaminated OWT | data-prep died at SLURM time limit; resumable v2 added (`slurm/real_generate_v2.sbatch`) |
 | Prime brittleness | p=97 replication of cliff | new code added (`src/run_prime_sweep.py`); cheap, not yet run |
 

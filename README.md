@@ -17,6 +17,20 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Statistical analysis
+
+The repository includes a comprehensive multi-seed statistical analysis module (`src.analysis.report`) to formally define and quantify the 'grokking cliff' across conditions. This includes:
+- Aggregation of multi-seed logs, properly handling varying directory structures and serialization formats (JSON, JSONL, CSV).
+- Formal changepoint detection using both threshold-dwell and binary segmentation (variance reduction) strategies.
+- Treating 'failed to grokk' as right-censored data with Kaplan-Meier principles.
+- Fitting logistic and linear regressions to severity-vs-cliff-step relationships.
+- Endpoint accuracy hypothesis testing (Mann-Whitney U with Holm-Bonferroni correction).
+
+Generate a report via:
+```bash
+python -m src.analysis.report --dirs results/exp_c_grid/wd0.3/* --out analysis/multi_seed/
+```
+
 ## Quick start
 
 ```bash

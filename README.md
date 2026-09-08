@@ -40,6 +40,39 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Attention visualization
+
+New to this project is a systematic visualization suite to observe grokking-driven attention pattern shifts.
+
+**Extraction**:
+```bash
+python scripts/extract_attention.py \
+    --checkpoint-dir results/exp_c_grid/wd1/noise0/seed_42 \
+    --output-dir results/attention_pure \
+    --device cpu
+```
+
+**Visualization**:
+```bash
+python scripts/visualize_attention.py \
+    --npz-dirs results/attention_pure results/attention_contam \
+    --condition-names Pure Contaminated \
+    --output-dir analysis/attention_viz
+```
+This generates:
+- `entropy_layer_X.png`: Line plots tracking Shannon entropy per head over training steps. A sharp drop often accompanies the grokking cliff.
+- `heatmap_*.png`: Non-interactive static heatmaps of the attention weights for a chosen step.
+- `cluster_*.png`: Similarity clustering of head attention distributions based on Jensen-Shannon Divergence.
+
+**Comparative Analysis**:
+```bash
+python scripts/compare_attention.py \
+    --pure-dir results/attention_pure \
+    --contam-dir results/attention_contam \
+    --output analysis/attention_viz/comparison.md
+```
+Generates a markdown report summarizing JSD per-head, entropy deltas, and whether head clusters swap roles between pure and model-collapse regimes.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

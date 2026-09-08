@@ -48,8 +48,10 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
     Detect the step at which a phase transition occurs.
     Returns the step number or None if no transition detected.
     """
+    # use precision safe threshold check as per memory directives
     for entry in history:
-        if entry.get(metric, 0) >= threshold:
+        val = entry.get(metric)
+        if val is not None and not np.isnan(val) and val >= threshold - 1e-6:
             return entry["step"]
     return None
 

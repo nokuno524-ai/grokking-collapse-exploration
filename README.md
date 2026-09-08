@@ -40,6 +40,20 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Statistical Methods
+
+To properly quantify the "cliff-like" nature of grokking, we employ several statistical techniques for changepoint estimation and confidence bounding:
+- **Logistic Curve Fitting:** A logistic function $L / (1 + \exp(-k(x - x_0))) + b$ is fitted to accuracy curves over training steps. The grokking step is formally identified where this curve crosses the 0.95 test-accuracy threshold.
+- **Bootstrap Confidence Intervals:** For single-run changepoint estimates, we compute non-parametric 95% CIs via resampling (with temporal jitter to preserve curve fitting stability).
+- **Wilson Score Intervals:** Grokking probabilities $P(Grok)$ per condition across seeds are bounded using the Wilson score interval, correctly handling zero successes (censored failures).
+- **Kaplan-Meier Survival Analysis:** "Failed to grok" endpoints are treated as right-censored data, allowing for proper median time-to-grok estimations in conditions with partial grokking success.
+- **Holm-Mann-Whitney U Test & Cohen's d:** For endpoint accuracy and effect sizes between conditions, non-parametric tests and pooled variance estimates are used.
+
+To aggregate multi-seed runs into a rigorous stats table, execute the run aggregator module:
+```bash
+python -m src.analysis.grok_detector.run_aggregator results/multi_seed/
+```
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

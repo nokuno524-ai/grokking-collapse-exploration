@@ -60,8 +60,10 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
                 if not history:
                     continue
                 
-                steps = [e["step"] for e in history]
-                values = [e.get(metric, 0) for e in history]
+                # filter out NaNs and Nones
+                filtered_history = [e for e in history if e.get(metric) is not None and not np.isnan(e.get(metric))]
+                steps = [e["step"] for e in filtered_history]
+                values = [e.get(metric) for e in filtered_history]
                 color = colors.get(condition_dir.name, "gray")
                 ax.plot(steps, values, label=condition_dir.name, color=color, alpha=0.8)
             except Exception:

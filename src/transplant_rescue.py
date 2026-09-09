@@ -79,10 +79,12 @@ try:
     from .model import ModularArithmeticTransformer
     from .data import DatasetConfig, generate_modular_arithmetic
     from .train import compute_fourier_concentration, evaluate
+    from .checkpoint import load_run
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
-    from train import compute_fourier_concentration, evaluate  # type: ignore
+    from train import compute_fourier_concentration, evaluate
+    from checkpoint import load_run  # type: ignore
 
 
 # Mapping from a short component name to the regex of state_dict keys it covers.
@@ -131,35 +133,6 @@ def keys_for(component: str, sd: Dict[str, torch.Tensor]) -> List[str]:
     return [k for k in sd.keys() if re.match(pat, k)]
 
 
-def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
-    """Return (state_dict, config) for the given run.
-    If step is None, picks the largest checkpoint."""
-    ckpts = sorted(run_dir.glob("checkpoint_*.pt"),
-                   key=lambda p: int(re.findall(r"\d+", p.name)[-1]))
-    if not ckpts:
-        raise FileNotFoundError(f"no checkpoint_*.pt in {run_dir}")
-    chosen: Optional[Path] = None
-    if step is not None:
-        for p in ckpts:
-            if int(re.findall(r"\d+", p.name)[-1]) == step:
-                chosen = p
-                break
-        if chosen is None:
-            raise FileNotFoundError(f"no checkpoint_{step}.pt in {run_dir}")
-    else:
-        chosen = ckpts[-1]
-    ckpt = torch.load(chosen, map_location="cpu", weights_only=False)
-    if isinstance(ckpt, dict) and "model_state" in ckpt:
-        sd = ckpt["model_state"]
-        cfg = ckpt.get("config", {})
-    else:
-        sd = ckpt
-        cfg = {}
-    res_path = run_dir / "results.json"
-    if not cfg and res_path.exists():
-        with res_path.open() as f:
-            cfg = json.load(f).get("config", {})
-    return sd, cfg
 
 
 def build_model(cfg: dict, device: torch.device) -> ModularArithmeticTransformer:
@@ -261,8 +234,11 @@ def make_loaders(
     train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(dc)
     train_ds = TensorDataset(train_in, train_tgt)
     test_ds = TensorDataset(test_in, test_tgt)
+    # Reset random seed right before dataloader to prevent eval-leaks in batch ordering
     g = torch.Generator()
     g.manual_seed(int(cfg.get("seed", 42)))
+    torch.manual_seed(int(cfg.get("seed", 42)))
+
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, generator=g)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
@@ -351,9 +327,7 @@ def run_one_variant(
         sd = patch_state_dict(base_sd, donor_sd or {}, component,
                               randomize=randomize, rng=rng)
     model = build_model(cfg_for_model, device)
-    missing, unexpected = model.load_state_dict(sd, strict=False)
-    if unexpected:
-        raise RuntimeError(f"unexpected keys when loading patched sd: {unexpected}")
+    model.load_state_dict(sd, strict=True)
     train_loader, test_loader = make_loaders(cfg_for_loaders, device=device)
     if rescue_steps > 0 and component is not None:
         torch.manual_seed(rescue_seed)

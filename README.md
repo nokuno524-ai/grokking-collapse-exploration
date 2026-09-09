@@ -40,6 +40,16 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Mechanistic analysis
+
+To investigate which internal model components (such as attention heads or MLP dimensions) drive the difference between grokking (pure data) and non-grokking (collapsed data), you can use the per-layer transplant atlas. This systematically grafts components between aligned checkpoints to measure zero-shot test accuracy recovery.
+
+```bash
+# Generate the component transplant atlas
+python src/transplant/atlas.py --pure-run <path_to_pure_model> --contam-run <path_to_collapsed_model>
+```
+Outputs (CSV and heatmap PNGs) will be generated in `analysis/atlas/`. See `analysis/MECHANISTIC_SUMMARY.md` for our primary findings.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

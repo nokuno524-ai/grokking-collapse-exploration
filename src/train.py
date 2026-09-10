@@ -28,6 +28,7 @@ class TrainConfig:
     """Training configuration."""
     # Model
     prime: int = 59
+    num_operands: int = 2
     d_model: int = 128
     n_heads: int = 4
     d_ff: int = 512
@@ -123,6 +124,7 @@ def train(config: TrainConfig) -> TrainState:
     # Generate data
     data_config = DatasetConfig(
         prime=config.prime,
+        num_operands=config.num_operands,
         train_fraction=config.train_fraction,
         collapse_level=config.collapse_level,
         collapse_severity=config.collapse_severity,
@@ -145,6 +147,7 @@ def train(config: TrainConfig) -> TrainState:
     # Create model
     model = ModularArithmeticTransformer(
         prime=config.prime,
+        num_operands=config.num_operands,
         d_model=config.d_model,
         n_heads=config.n_heads,
         d_ff=config.d_ff,

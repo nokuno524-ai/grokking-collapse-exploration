@@ -25,6 +25,7 @@ class ModularArithmeticTransformer(nn.Module):
     def __init__(
         self,
         prime: int = 59,
+        num_operands: int = 2,
         d_model: int = 128,
         n_heads: int = 4,
         d_ff: int = 512,
@@ -33,14 +34,15 @@ class ModularArithmeticTransformer(nn.Module):
     ):
         super().__init__()
         self.prime = prime
+        self.num_operands = num_operands
         self.d_model = d_model
         self.n_heads = n_heads
         
         # Token embeddings (0 to p-1)
         self.token_embed = nn.Embedding(prime, d_model)
         
-        # Positional embeddings (2 positions: a and b)
-        self.pos_embed = nn.Embedding(2, d_model)
+        # Positional embeddings (num_operands positions)
+        self.pos_embed = nn.Embedding(num_operands, d_model)
         
         # Transformer layers
         encoder_layer = nn.TransformerEncoderLayer(
@@ -76,25 +78,26 @@ class ModularArithmeticTransformer(nn.Module):
         Forward pass.
         
         Args:
-            x: Input tensor of shape (batch, 2) with values in [0, prime)
+            x: Input tensor of shape (batch, num_operands) with values in [0, prime)
         
         Returns:
             Logits of shape (batch, prime)
         """
         batch_size = x.shape[0]
+        seq_len = x.shape[1]
         
         # Token embeddings
-        tok = self.token_embed(x)  # (batch, 2, d_model)
+        tok = self.token_embed(x)  # (batch, seq_len, d_model)
         
         # Positional embeddings
-        positions = torch.arange(2, device=x.device).unsqueeze(0).expand(batch_size, -1)
-        pos = self.pos_embed(positions)  # (batch, 2, d_model)
+        positions = torch.arange(seq_len, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        pos = self.pos_embed(positions)  # (batch, seq_len, d_model)
         
         # Combine
-        h = tok + pos  # (batch, 2, d_model)
+        h = tok + pos  # (batch, seq_len, d_model)
         
         # Transformer
-        h = self.transformer(h)  # (batch, 2, d_model)
+        h = self.transformer(h)  # (batch, seq_len, d_model)
         h = self.ln(h)
         
         # Pool across positions (mean) and predict
@@ -135,7 +138,7 @@ def count_parameters(model: nn.Module) -> int:
 
 
 if __name__ == "__main__":
-    model = ModularArithmeticTransformer()
+    model = ModularArithmeticTransformer(num_operands=2)
     print(f"Model parameters: {count_parameters(model):,}")
     
     x = torch.randint(0, 59, (4, 2))

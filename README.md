@@ -33,6 +33,10 @@ sbatch slurm/exp_c_grid.sbatch
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
 
+# Run the task difficulty vs model collapse sweep
+python src/sweep/difficulty_sweep.py --max-steps 50000
+python src/analysis/difficulty_analysis.py --results-dir results/difficulty --output-dir analysis/difficulty
+
 # Surgical transplant rescue (after Experiment A is run)
 python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
@@ -60,6 +64,7 @@ src/
   run_scarcity_baseline.py # train-fraction baseline
   run_multi_seed.py        # 5-seed × 5-condition repeat
   run_prime_sweep.py       # second-prime brittleness check (NEW)
+  sweep/difficulty_sweep.py # sweeps task difficulty vs collapse severity
   transplant_rescue.py     # surgical-circuit transplant (Exp A, NEW)
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)
   causal_circuit_rescue.py # observational per-matrix rank trajectory

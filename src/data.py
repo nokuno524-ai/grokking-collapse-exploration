@@ -8,12 +8,14 @@ import torch
 import numpy as np
 from dataclasses import dataclass
 from typing import Optional, Tuple
+import itertools
 
 
 @dataclass
 class DatasetConfig:
     """Configuration for dataset generation."""
     prime: int = 59  # Modular arithmetic modulus
+    num_operands: int = 2 # Number of operands (e.g. 2 for a+b)
     train_fraction: float = 0.3  # Fraction of data for training
     collapse_level: float = 0.0  # Fraction of training data replaced by synthetic
     collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
@@ -23,19 +25,19 @@ class DatasetConfig:
 
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Generate (a, b) -> (a + b) mod p dataset.
+    Generate inputs -> sum(inputs) mod p dataset.
     
     Returns:
         train_inputs, train_targets, test_inputs, test_targets
-        Inputs are (a, b) pairs encoded as token indices.
-        Targets are (a + b) mod p.
+        Inputs are tuples encoded as token indices.
+        Targets are sum(inputs) mod p.
     """
     p = config.prime
     rng = np.random.RandomState(config.seed)
     
-    # Generate all possible (a, b) pairs
-    all_pairs = [(a, b) for a in range(p) for b in range(p)]
-    all_targets = [(a + b) % p for a, b in all_pairs]
+    # Generate all possible operand combinations
+    all_pairs = list(itertools.product(range(p), repeat=config.num_operands))
+    all_targets = [sum(ops) % p for ops in all_pairs]
     
     # Shuffle and split
     indices = rng.permutation(len(all_pairs))

@@ -185,19 +185,27 @@ def detect_phase_transition(groups: Dict[int, List[dict]]) -> Dict[str, dict]:
         means = []
         for ratio in ratios:
             vals = [final_value(r, metric) for r in groups[ratio]]
-            vals = [v for v in vals if not np.isnan(v)]
+            vals = [v for v in vals if v is not None and not np.isnan(v)]
             means.append(float(np.mean(vals)) if vals else float("nan"))
         means_arr = np.array(means)
         if len(means_arr) < 2 or np.all(np.isnan(means_arr)):
             continue
-        diffs = np.abs(np.diff(means_arr))
+
+        diffs = np.zeros(len(means_arr) - 1)
+        for j in range(len(means_arr) - 1):
+            if np.isnan(means_arr[j]) or np.isnan(means_arr[j+1]):
+                diffs[j] = np.nan
+            else:
+                diffs[j] = np.abs(means_arr[j+1] - means_arr[j])
+
         if np.all(np.isnan(diffs)):
             continue
+
         i = int(np.nanargmax(diffs))
         out[metric] = {
-            "transition_between_ratios": [ratios[i], ratios[i + 1]],
+            "transition_between_ratios": [int(ratios[i]), int(ratios[i + 1])],
             "delta": float(diffs[i]),
-            "means_by_ratio": dict(zip(ratios, [float(m) for m in means_arr])),
+            "means_by_ratio": dict(zip(ratios, [float(m) if not np.isnan(m) else None for m in means_arr])),
         }
     return out
 

@@ -82,3 +82,11 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Statistical methods
+
+The codebase now includes rigorous statistical inference tools for evaluating grokking claims:
+* **Changepoint detection**: Implemented in `src/analysis/grok_detector/detectors.py`. Supports Bayesian Online Changepoint Detection (BOCD), smoothed derivatives, and piecewise linear fits to precisely locate the 'grok step', complete with bootstrap confidence intervals.
+* **Survival analysis**: Implemented in `src/analysis/grok_detector/stats.py`. When a run fails to grok within a compute budget, it is treated as a right-censored observation using Kaplan-Meier estimators rather than an absolute failure.
+* **Comparison tests**: Log-rank and permutation tests rigorously evaluate if differences in grokking times across collapse levels are statistically significant.
+* **Reporting**: The multi-seed CLI tool (`src/analysis/report.py`) automatically aggregates runs across severity conditions and emits a Markdown report (`analysis/CLIFF_RIGOR.md`) containing survival plots, step distributions, and statistical pairwise tests.

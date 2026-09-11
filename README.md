@@ -40,6 +40,19 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Attention visualization
+
+To visually compare attention patterns (heatmaps, evolution across training, and metrics like entropy) between pure and collapsed models:
+
+```bash
+python scripts/compare_attention.py \
+    --pure-dir results/exp_c_grid/wd1/noise0/seed_42 \
+    --col-dir results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --out-dir analysis/attention
+```
+
+This generates plots in `analysis/attention/` comparing matched checkpoints on identical input batches.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

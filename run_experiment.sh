@@ -25,6 +25,6 @@ python src/train.py --all --max-steps 50000 --output-dir results
 
 # Generate analysis
 python src/progress_measures.py results/
-python src/analysis.py results/
+python src/analysis_legacy.py results/
 
 echo "=== Done: $(date) ==="

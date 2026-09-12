@@ -11,6 +11,10 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 3. **Noise ≡ "model-collapse" contamination at matched rate.** At noise=0.15, random-label noise and temperature-warped collapse contamination produce statistically indistinguishable test-acc and Fourier-concentration distributions (n=5 each). The original "collapse is a distinct phenomenon" framing is **refuted by our own baseline**.
 4. **Scarcity dissociation.** At 50% less training data, the model still groks and Fourier concentration is *higher* than at full data — while at 15% corrupted data it does not grok. This rules out "contamination = effective sample-size shrinkage" as the mechanism.
 
+## Robustness of headline claims
+We have conducted a multiplicity analysis to stress-test the grokking cliffs and weight-norm reduction claims across defensible analytic regimes (varying smoothing windows, threshold metrics, and accuracy targets).
+Results showing the survival rate of the claims (e.g. Pure groks early, weight-norm reduction correlates negatively with collapse severity) can be found in `analysis/CLIFF_RIGOR.md`.
+
 ## Status (2026-05-10)
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.

@@ -592,8 +592,19 @@ def main():
 
     # Persist
     json_path = args.output_dir / "rescue_results.json"
+
+    # Clean floats for determinism
+    def _clean_floats(obj):
+        if isinstance(obj, float):
+            return round(obj, 6)
+        elif isinstance(obj, dict):
+            return {k: _clean_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_clean_floats(x) for x in obj]
+        return obj
+
     with json_path.open("w") as f:
-        json.dump({
+        json.dump(_clean_floats({
             "pure_run": str(args.pure_run),
             "contam_run": str(args.contam_run),
             "pure_cfg": pure_cfg,

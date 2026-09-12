@@ -90,7 +90,8 @@ def apply_collapse(
     from collections import Counter
     target_counts = Counter(targets)
     total = len(targets)
-    freq = {t: c / total for t, c in target_counts.items()}
+    # Sort keys for determinism
+    freq = {t: target_counts[t] / total for t in sorted(target_counts.keys())}
     
     # Create collapsed distribution: amplify common targets, suppress rare ones
     # Use temperature to control severity
@@ -102,7 +103,8 @@ def apply_collapse(
     
     # Normalize
     total_prob = sum(collapsed_probs.values())
-    collapsed_probs = {t: p / total_prob for t, p in collapsed_probs.items()}
+    # Sort keys for determinism when converting to list
+    collapsed_probs = {t: collapsed_probs[t] / total_prob for t in sorted(collapsed_probs.keys())}
     
     # Sample from collapsed distribution
     collapsed_targets = list(collapsed_probs.keys())

@@ -231,8 +231,19 @@ def train_one(
                   f"rank={metrics['attn_effective_rank']:.2f} "
                   f"H={metrics['repr_entropy']:.3f} "
                   f"cos={metrics['cos_sim_mean']:.3f}", flush=True)
+
+            # Clean floats for determinism
+            def _clean_floats(obj):
+                if isinstance(obj, float):
+                    return round(obj, 6)
+                elif isinstance(obj, dict):
+                    return {k: _clean_floats(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [_clean_floats(x) for x in obj]
+                return obj
+
             with open(results_path, "w") as f:
-                json.dump({
+                json.dump(_clean_floats({
                     "ratio_pct": ratio_pct,
                     "seed": seed,
                     "max_steps": max_steps,

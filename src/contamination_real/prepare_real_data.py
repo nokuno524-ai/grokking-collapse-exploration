@@ -450,7 +450,7 @@ def main() -> None:
         "max_seq_len": MAX_SEQ_LEN,
         "tokenizer": args.tokenizer,
     }
-    (data_root / "config.json").write_text(json.dumps(config_record, indent=2))
+    (data_root / "config.json").write_text(json.dumps(config_record, indent=2, sort_keys=True))
 
     for ratio_pct in args.ratios:
         ratio = float(ratio_pct) / 100.0

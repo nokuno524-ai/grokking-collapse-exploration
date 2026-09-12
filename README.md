@@ -47,10 +47,29 @@ python src/transplant_rescue.py \
 - Default optimizer: AdamW, lr=1e-3, wd=1.0, batch=512, 50000 steps.
 - Default task: `(a+b) mod 59` with 30% train fraction.
 
+## Experiment registry & provenance
+
+We have implemented a lightweight JSON-backed registry and dataset lineage checking system to track the provenance of all experiments.
+
+The registry is located at `experiments/registry.json`. It maps unique `run_id` strings to the Git SHA, exact configuration, dataset hashes, and run metrics.
+- The `src/provenance/registry.py` module exposes a Python API and CLI tool (e.g. `python -m src.provenance.registry query`) to inspect and diff experiments.
+- The `src/provenance/lineage.py` tool provides deterministic hash checks on generated synthetic datasets (`generate_modular_arithmetic`).
+- A one-time retroactive migration (`src/provenance/migration.py`) reconstructed 235 existing runs into the registry system successfully.
+
+To use the CLI:
+```bash
+python -m src.provenance.registry query
+python -m src.provenance.registry diff run_id_1 run_id_2
+```
+
 ## Repository layout
 
 ```
+experiments/
+  registry.json            # central registry for all experiments
+
 src/
+  provenance/              # registry, migration, and lineage hash checking
   train.py                 # core training loop
   data.py                  # dataset generation + collapse + label noise
   model.py                 # ModularArithmeticTransformer (214K params)

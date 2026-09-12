@@ -308,8 +308,19 @@ def write_run_report(run, out_dir: Path):
         "transitions": transitions,
     }
     out_path = out_dir / f"trace_{tag}.json"
+
+    # Clean floats and sort keys for determinism
+    def _clean_floats(obj):
+        if isinstance(obj, float):
+            return round(obj, 6)
+        elif isinstance(obj, dict):
+            return {k: _clean_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_clean_floats(x) for x in obj]
+        return obj
+
     with out_path.open("w") as f:
-        json.dump(serial, f, indent=2, default=lambda o: None)
+        json.dump(_clean_floats(serial), f, indent=2, sort_keys=True, default=lambda o: None)
     return tag, transitions
 
 

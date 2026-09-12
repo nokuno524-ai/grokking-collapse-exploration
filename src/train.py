@@ -260,8 +260,19 @@ def train(config: TrainConfig) -> TrainState:
     }
     
     results_path = output_dir / "results.json"
+
+    # Clean floats for determinism
+    def _clean_floats(obj):
+        if isinstance(obj, float):
+            return round(obj, 6)
+        elif isinstance(obj, dict):
+            return {k: _clean_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_clean_floats(x) for x in obj]
+        return obj
+
     with open(results_path, "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(_clean_floats(results), f, indent=2, sort_keys=True)
     
     print(f"\nResults saved to {results_path}")
     print(f"Grokked: {state.grokked} at step {state.grokking_step}")

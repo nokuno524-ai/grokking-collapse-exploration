@@ -34,11 +34,49 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python src/transplant/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
 ```
+
+## Circuit transplant follow-ups
+
+We have extended the circuit transplant code into a generalized sweep framework that grafts arbitrary component sets from a donor model to a host model and measures zero-shot test accuracy recovery. You can run the framework using a declarative JSON config:
+
+```bash
+python src/transplant/sweep.py \
+    --config my_sweep_config.json \
+    --host-dirs run/host_seed1 run/host_seed2 \
+    --donor-dirs run/donor_seed1 run/donor_seed2 \
+    --output-dir analysis/transplant_sweep
+```
+
+### Config Format
+The experiment config specifies named graft sets, mapped to a list of regex patterns or prefix strings for their component weights:
+```json
+{
+  "graft_sets": [
+    {
+      "name": "attn_layer_0",
+      "components": ["self_attn_in_proj", "self_attn_out_proj"]
+    },
+    {
+      "name": "mlp_layer_0",
+      "components": ["linear1", "linear2"]
+    }
+  ]
+}
+```
+
+### Ablation Controls and Recovery Fraction
+For each graft set, we measure performance under three conditions:
+1. `donor`: the actual donor (grokked) weights.
+2. `sham`: a mock graft copying the host's own weights back into itself (checks for perturbations/bugs).
+3. `random`: grafts randomly initialized weights of identical shape (preserves spectral norm where appropriate). Any performance improvement over this control is strictly due to the learned donor representations.
+
+We evaluate these conditions across multiple matched seeds, measuring the zero-shot **recovery fraction**:
+`recovery = (graft_acc - host_acc) / max(1e-9, donor_acc - host_acc)`. A recovery near 1.0 means the missing grokking mechanism is entirely contained within the grafted component. We compute statistical significance via permutation tests against the sham control.
 
 ## Architecture
 

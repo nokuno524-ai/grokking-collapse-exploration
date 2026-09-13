@@ -76,13 +76,13 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
-    from model import ModularArithmeticTransformer  # type: ignore
-    from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
-    from train import compute_fourier_concentration, evaluate  # type: ignore
+    from ..model import ModularArithmeticTransformer  # type: ignore
+    from ..data import DatasetConfig, generate_modular_arithmetic  # type: ignore
+    from ..train import compute_fourier_concentration, evaluate  # type: ignore
 
 
 # Mapping from a short component name to the regex of state_dict keys it covers.
@@ -326,6 +326,8 @@ def rescue_train(
         loss = F.cross_entropy(model(x), y)
         loss.backward()
         opt.step()
+
+    model.eval()
     return evaluate_model(model, train_loader, test_loader, device)
 
 
@@ -354,6 +356,10 @@ def run_one_variant(
     missing, unexpected = model.load_state_dict(sd, strict=False)
     if unexpected:
         raise RuntimeError(f"unexpected keys when loading patched sd: {unexpected}")
+
+    # Ensure model is in eval mode before zero-shot evaluation
+    model.eval()
+
     train_loader, test_loader = make_loaders(cfg_for_loaders, device=device)
     if rescue_steps > 0 and component is not None:
         torch.manual_seed(rescue_seed)

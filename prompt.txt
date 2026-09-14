@@ -1,0 +1,9 @@
+[PROJECT CONTEXT]: This repo studies grokking and model collapse in small transformers on modular arithmetic. Mechanistic claims about attention-pattern shifts during collapse vs grokking exist in notes but lack reusable visualization tooling.
+
+[TASK]: Do ALL of the following:
+1. Attention visualization scripts: Build a script that, given a checkpoint (or a sweep of checkpoints), extracts per-head attention matrices on a fixed batch of modular-arithmetic prompts and renders publication-quality figures: per-head attention heatmaps, head-role summaries (row-entropy, diagonal dominance, uniformity), and trajectories of these summary stats across training steps.
+2. Cross-condition comparison: Generate side-by-side figure grids comparing pure vs medium-collapse vs severe-collapse runs, highlighting heads that change role.
+3. Aggregation: A small CLI that walks a results directory, finds all runs, and produces one summary PDF/HTML report with all figures plus a CSV of head-summary statistics per run/step.
+4. Code Review: review the checkpoint loading and hook-based attention capture for correctness (hooks firing under no_grad, heads reshaped in wrong order, layer indexing). Fix.
+5. Testing: pytest with a tiny 2-layer model verifying attention extraction shapes, summary-statistic values on hand-constructed attention matrices (uniform -> max entropy; one-hot -> min), and report generation on a temp dir.
+6. Documentation: README usage guide with example invocations; docstrings on all public functions.

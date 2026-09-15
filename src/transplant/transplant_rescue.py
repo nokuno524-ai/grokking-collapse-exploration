@@ -76,9 +76,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
@@ -213,8 +213,7 @@ def random_basis_swap(weight: torch.Tensor, rng: torch.Generator) -> torch.Tenso
     # Random orthonormal U' and Vh' of correct shapes.
     Ur, _ = torch.linalg.qr(torch.randn(U.shape, generator=rng))
     Vr, _ = torch.linalg.qr(torch.randn(Vh.T.shape, generator=rng))
-    Vhr = Vr.T
-    return Ur @ torch.diag(S) @ Vhr
+    return (Ur * S) @ Vr.T
 
 
 def patch_state_dict(
@@ -285,6 +284,7 @@ def evaluate_model(
     test_loader: DataLoader,
     device: torch.device,
 ) -> Dict[str, float]:
+    model.eval()
     train_loss, train_acc = evaluate(model, train_loader, device)
     test_loss, test_acc = evaluate(model, test_loader, device)
     fc = compute_fourier_concentration(model)

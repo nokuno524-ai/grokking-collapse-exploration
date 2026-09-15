@@ -195,30 +195,30 @@ def train(config: TrainConfig) -> TrainState:
         
         # Evaluate periodically
         if step % config.eval_every == 0:
-            train_loss, train_acc = evaluate(model, train_loader, device)
-            test_loss, test_acc = evaluate(model, test_loader, device)
+            train_loss_eval, train_acc_eval = evaluate(model, train_loader, device)
+            test_loss_eval, test_acc_eval = evaluate(model, test_loader, device)
             
-            state.train_loss = train_loss
-            state.test_loss = test_loss
-            state.train_acc = train_acc
-            state.test_acc = test_acc
+            state.train_loss = train_loss_eval
+            state.test_loss = test_loss_eval
+            state.train_acc = train_acc_eval
+            state.test_acc = test_acc_eval
             state.weight_norm = model.get_weight_norm()
             state.embedding_rank = model.get_embedding_rank()
             state.fourier_concentration = compute_fourier_concentration(model)
             
             # Detect grokking
-            if test_acc >= state.grokking_threshold and not state.grokked:
+            if state.test_acc >= state.grokking_threshold and not state.grokked:
                 state.grokked = True
                 state.grokking_step = step
-                print(f"🎉 GROKKING at step {step}! Test acc: {test_acc:.4f}")
+                print(f"🎉 GROKKING at step {step}! Test acc: {state.test_acc:.4f}")
             
             # Log
             entry = {
                 "step": step,
-                "train_loss": train_loss,
-                "test_loss": test_loss,
-                "train_acc": train_acc,
-                "test_acc": test_acc,
+                "train_loss": state.train_loss,
+                "test_loss": state.test_loss,
+                "train_acc": state.train_acc,
+                "test_acc": state.test_acc,
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
@@ -229,8 +229,8 @@ def train(config: TrainConfig) -> TrainState:
                 elapsed = time.time() - start_time
                 print(
                     f"Step {step:5d} | "
-                    f"train_loss={train_loss:.4f} test_loss={test_loss:.4f} | "
-                    f"train_acc={train_acc:.4f} test_acc={test_acc:.4f} | "
+                    f"train_loss={state.train_loss:.4f} test_loss={state.test_loss:.4f} | "
+                    f"train_acc={state.train_acc:.4f} test_acc={state.test_acc:.4f} | "
                     f"‖W‖={state.weight_norm:.2f} rank={state.embedding_rank:.1f} "
                     f"fourier={state.fourier_concentration:.3f} | "
                     f"time={elapsed:.1f}s"

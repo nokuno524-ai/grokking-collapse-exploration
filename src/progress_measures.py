@@ -43,7 +43,7 @@ def compute_generalization_gap(history: List[Dict]) -> List[float]:
 
 
 def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
-                            threshold: float = 0.9) -> Optional[int]:
+                            threshold: float = 0.95) -> Optional[int]:
     """
     Detect the step at which a phase transition occurs.
     Returns the step number or None if no transition detected.
@@ -56,16 +56,17 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
 
 def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
                            window: int = 10) -> List[Dict]:
-    """Compute rate of change of a metric over a sliding window."""
+    """Compute rate of change of a metric over a sliding window using central differences."""
     speeds = []
+    half_window = window // 2
     for i in range(len(history)):
-        if i < window:
+        if i < half_window or i >= len(history) - half_window:
             speed = 0.0
         else:
-            current = history[i].get(metric, 0)
-            past = history[i - window].get(metric, 0)
-            steps_diff = history[i]["step"] - history[i - window]["step"]
-            speed = (current - past) / max(steps_diff, 1) * 1000  # per 1000 steps
+            future = history[i + half_window].get(metric, 0)
+            past = history[i - half_window].get(metric, 0)
+            steps_diff = history[i + half_window]["step"] - history[i - half_window]["step"]
+            speed = (future - past) / max(steps_diff, 1) * 1000  # per 1000 steps
         speeds.append({"step": history[i]["step"], f"{metric}_speed": speed})
     return speeds
 

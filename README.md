@@ -34,10 +34,15 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python src/transplant/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Severity transplant sweep (Feature attribution)
+python src/transplant/sweep.py \
+    --multi-seed-dir results/multi_seed \
+    --output-dir analysis/transplant_sweep
 ```
 
 ## Architecture

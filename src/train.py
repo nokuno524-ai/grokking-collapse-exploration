@@ -136,10 +136,13 @@ def train(config: TrainConfig) -> TrainState:
 
     loader_generator = torch.Generator()
     loader_generator.manual_seed(config.seed)
+
+    torch.manual_seed(config.seed)
     train_loader = DataLoader(
         train_dataset, batch_size=config.batch_size, shuffle=True,
         generator=loader_generator,
     )
+    torch.manual_seed(config.seed)
     test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
     
     # Create model

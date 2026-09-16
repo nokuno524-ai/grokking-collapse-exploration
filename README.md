@@ -34,10 +34,17 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python src/transplant/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Surgical transplant follow-ups (Ablation and Head-level transplant)
+python src/transplant/head_transplant.py \
+    --pure-runs results/exp_c_grid/wd1/noise0/seed_42 \
+    --contam-runs results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --ablate-type zero \
+    --head-idx 1
 ```
 
 ## Architecture
@@ -60,16 +67,17 @@ src/
   run_scarcity_baseline.py # train-fraction baseline
   run_multi_seed.py        # 5-seed × 5-condition repeat
   run_prime_sweep.py       # second-prime brittleness check (NEW)
-  transplant_rescue.py     # surgical-circuit transplant (Exp A, NEW)
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)
   causal_circuit_rescue.py # observational per-matrix rank trajectory
   progress_measures.py     # Chan-style progress measures, leading-indicator variant
-  analysis.py              # per-condition plot/table generation
+  analysis_legacy.py       # per-condition plot/table generation
+  checkpoint.py            # checkpoint loader
+  transplant/              # circuit transplantation experiments
+  analysis/                # generated tables, plots, markdown summaries
   contamination/           # toy contamination experiment
   contamination_real/      # GPT-2 medium + LoRA on contaminated OWT (Exp B)
 
 slurm/                     # one .sbatch per experiment block
-analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
 

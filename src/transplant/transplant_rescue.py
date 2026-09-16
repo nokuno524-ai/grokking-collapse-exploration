@@ -76,10 +76,13 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
     from train import compute_fourier_concentration, evaluate  # type: ignore
@@ -262,8 +265,12 @@ def make_loaders(
     train_ds = TensorDataset(train_in, train_tgt)
     test_ds = TensorDataset(test_in, test_tgt)
     g = torch.Generator()
-    g.manual_seed(int(cfg.get("seed", 42)))
+    seed = int(cfg.get("seed", 42))
+    g.manual_seed(seed)
+
+    torch.manual_seed(seed)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, generator=g)
+    torch.manual_seed(seed)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
 
@@ -285,6 +292,7 @@ def evaluate_model(
     test_loader: DataLoader,
     device: torch.device,
 ) -> Dict[str, float]:
+    model.eval()
     train_loss, train_acc = evaluate(model, train_loader, device)
     test_loss, test_acc = evaluate(model, test_loader, device)
     fc = compute_fourier_concentration(model)

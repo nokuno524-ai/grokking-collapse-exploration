@@ -38,7 +38,39 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Attention Extraction & Visualization
+# 1. Extract metrics to a CSV and attention matrices to NPZ
+python scripts/extract_attention_run.py \
+    --run-dir results/exp_c_grid/wd1/noise0/seed_42 \
+    --output-dir analysis/attention/pure_run
+
+python scripts/extract_attention_run.py \
+    --run-dir results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --output-dir analysis/attention/contam_run
+
+# 2. Visualize per-head heatmaps
+python scripts/visualize_attention.py \
+    --heatmap-npz analysis/attention/pure_run/attention_step_50000.npz \
+    --out-dir analysis/attention/plots
+
+# 3. Visualize entropy timeline
+python scripts/visualize_attention.py \
+    --timeline-csv analysis/attention/pure_run/attention_metrics.csv \
+    --out-dir analysis/attention/plots
+
+# 4. Compare pure vs collapse overlays
+python scripts/visualize_attention.py \
+    --overlay-pure analysis/attention/pure_run/attention_metrics.csv \
+    --overlay-contam analysis/attention/contam_run/attention_metrics.csv \
+    --out-dir analysis/attention/plots
 ```
+
+## Interpreting Attention Plots
+
+- **Attention Heatmaps:** Show how a given head allocates attention between Key positions 0 and 1 for each Query position. Pure grokked models often exhibit specialized sparse patterns, while collapsed models may diffuse attention evenly.
+- **Attention Entropy Timeline:** Drops in entropy signify the crystallization of attention circuits. A grokking cliff is typically preceded or accompanied by a steep plunge in this metric for key heads.
+- **Overlay Comparisons:** Contrast the trajectory of structural metrics (entropy, specialization score) between grokked (pure) and failed (collapse) runs. Failed runs often plateau in a state of high entropy or low specialization.
 
 ## Architecture
 

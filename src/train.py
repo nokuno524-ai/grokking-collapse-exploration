@@ -16,11 +16,17 @@ from typing import Optional, List
 try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
+    from .provenance.registry import ExperimentRegistry
     from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
     from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from src.provenance.registry import ExperimentRegistry
 
 
 @dataclass
@@ -40,7 +46,7 @@ class TrainConfig:
     batch_size: int = 512
     
     # Logging
-    eval_every: int = 100
+    eval_every: int = 50
     log_every: int = 50
     save_every: int = 5000
     
@@ -262,6 +268,14 @@ def train(config: TrainConfig) -> TrainState:
     results_path = output_dir / "results.json"
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
+
+    registry = ExperimentRegistry()
+    registry.log_run(
+        config=asdict(config),
+        seed=config.seed,
+        metrics_timeline=state.history,
+        status="completed_grokked" if state.grokked else "completed_not_grokked"
+    )
     
     print(f"\nResults saved to {results_path}")
     print(f"Grokked: {state.grokked} at step {state.grokking_step}")
@@ -269,7 +283,7 @@ def train(config: TrainConfig) -> TrainState:
     return state
 
 
-def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
+def run_all_conditions(output_dir: str = "results", max_steps: int = 50000) -> dict:
     """Run all experimental conditions."""
     conditions = get_all_conditions()
     results = {}

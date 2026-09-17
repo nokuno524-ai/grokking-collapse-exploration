@@ -73,6 +73,35 @@ analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
 
+## Attention analysis
+
+The repository includes a comprehensive visualization suite for analyzing attention patterns over training, which is particularly useful for studying grokking and model collapse.
+
+### Usage
+
+```python
+import torch
+from scripts.vis_attention import extract_attention_patterns, plot_attention_heatmaps, plot_fourier_scores, plot_entropy_over_training
+
+# Load model and dummy data
+# ... load your ModularArithmeticTransformer ...
+x = torch.randint(0, 59, (128, 2))
+
+# Extract attention matrices (L, B, H, S, S)
+attns = extract_attention_patterns(model, x)
+
+# Plot average head heatmaps
+plot_attention_heatmaps(attns, "results/figures/heatmaps.png")
+
+# Calculate Fourier periodicity scores to detect multiplication circuits
+plot_fourier_scores(attns, "results/figures/fourier.png")
+```
+
+The suite also supports:
+- **Entropy Tracking**: `plot_entropy_over_training` visualizes attention entropy collapse or spike across checkpoints.
+- **Head Clustering**: `plot_head_clustering` uses UMAP to map attention head behaviour colored by collapse severity.
+- **Head Ablation**: `rank_heads_by_ablation` ranks heads by their importance to generalization using leave-one-head-out (LOHO) ablation.
+
 ## References
 
 - Power et al. (2022), *Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets*.

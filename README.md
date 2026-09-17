@@ -17,12 +17,27 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Experiment Registry & Analysis
+
+All training runs via `src/train.py` are automatically tracked in a JSON-backed registry (`experiments/registry.json`). This logs configuration hashes, Git commits, random seeds, and grokking step metrics for easy querying later.
+
+We also support multi-seed aggregation with survival analysis. Runs are parsed and grouped by collapse severity, allowing us to calculate the probability of grokking across severities.
+
+**Running multi-seed aggregation:**
+You can compute and plot Kaplan-Meier survival curves using:
+```bash
+python -m src.analysis.grok_detector.run_aggregator --results-dir results --output analysis/survival_curves.png
+```
+
+**Reading survival curves:**
+The generated Kaplan-Meier plot shows the probability of *not* grokking as training progresses. Curves that remain high indicate that grokking is delayed or prevented entirely (right-censored) under those conditions.
+
 ## Quick start
 
 ```bash
 # Install (uv + venv, NOT conda — we are on Rivanna)
 uv venv .venv && source .venv/bin/activate
-uv pip install torch numpy matplotlib scipy
+uv pip install torch numpy matplotlib scipy pytest
 
 # Single training run
 python src/train.py --condition pure --max-steps 50000

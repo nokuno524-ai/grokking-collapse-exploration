@@ -261,8 +261,12 @@ def make_loaders(
     train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(dc)
     train_ds = TensorDataset(train_in, train_tgt)
     test_ds = TensorDataset(test_in, test_tgt)
+
+    seed = int(cfg.get("seed", 42))
+    torch.manual_seed(seed)
+
     g = torch.Generator()
-    g.manual_seed(int(cfg.get("seed", 42)))
+    g.manual_seed(seed)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, generator=g)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader

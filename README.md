@@ -82,3 +82,20 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Circuit transplant atlas
+
+The transplant atlas allows you to systematically take components (attention heads, MLPs) from a fully generalized (grokked) donor model and graft them into a failed (collapsed) recipient model, then optionally fine-tune to see if the circuit rescues generalization.
+
+The protocol works in two phases:
+1. **Scoring**: Computes importance scores via activation patching and weight norms for all donor components.
+2. **Transplanting**: Takes the top-k components and grafts them into the recipient, recording zero-shot and rescue test accuracy.
+
+Results are output as a JSONL artifact, which can then be analyzed using the analysis script to generate scatter plots mapping donor importance to rescue effect.
+
+Launch a small atlas run:
+```bash
+# Example: Donor (grokking), Recipient (collapsed)
+python src/transplant/atlas.py
+# (Atlas run logic integrates tightly with the run outputs and checkpoints)
+```

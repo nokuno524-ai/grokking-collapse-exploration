@@ -6,8 +6,10 @@ to simulate model collapse.
 
 import torch
 import numpy as np
+import hashlib
+from collections import Counter
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict
 
 
 @dataclass
@@ -19,6 +21,13 @@ class DatasetConfig:
     collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
     noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
     seed: int = 42
+    tree_depth: int = 1  # Number of recursive generations simulating collapse
+
+
+def get_condition_seed(base_seed: int, condition_name: str) -> int:
+    """Hash the condition name into the base seed to prevent seed reuse across conditions."""
+    h = hashlib.sha256(f"{base_seed}_{condition_name}".encode()).hexdigest()
+    return int(h, 16) % (2**32)
 
 
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -52,7 +61,8 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     if config.collapse_level > 0:
         train_pairs, train_targets_list = apply_collapse(
             train_pairs, train_targets_list, p,
-            config.collapse_level, config.collapse_severity, rng
+            config.collapse_level, config.collapse_severity, rng,
+            config.tree_depth
         )
 
     # Apply uniform random label noise (baseline ablation, mutually independent of collapse)
@@ -72,59 +82,79 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
 
 
 def apply_collapse(
-    pairs: list, targets: list, prime: int,
-    collapse_level: float, collapse_severity: float, rng: np.random.RandomState
-) -> Tuple[list, list]:
+    pairs: List[Tuple[int, int]], targets: List[int], prime: int,
+    collapse_level: float, collapse_severity: float, rng: np.random.RandomState,
+    tree_depth: int = 1
+) -> Tuple[List[Tuple[int, int]], List[int]]:
     """
     Simulate model collapse by replacing some targets with outputs from a "collapsed" model.
-    
-    A collapsed model has:
-    - Narrowed output distribution (favors common results)
-    - Occasional errors (assigns probability mass incorrectly)
-    - Loss of rare outputs
     """
     n_replace = int(len(targets) * collapse_level)
+    if n_replace == 0:
+        return list(pairs), list(targets)
+
     replace_idx = rng.choice(len(targets), n_replace, replace=False)
     
-    # Compute target frequency distribution
-    from collections import Counter
+    # Compute target frequency distribution exactly
     target_counts = Counter(targets)
     total = len(targets)
-    freq = {t: c / total for t, c in target_counts.items()}
+    # Ensure all targets are present and strictly sorted by keys to guarantee cross-environment determinism
+    current_probs = {t: target_counts.get(t, 0) / total for t in range(prime)}
     
     # Create collapsed distribution: amplify common targets, suppress rare ones
     # Use temperature to control severity
     temp = max(0.1, 1.0 - collapse_severity)
-    collapsed_probs = {}
+    
+    # Recursive generations simulating model collapse
+    for _ in range(tree_depth):
+        next_probs = {}
+        for t in range(prime):
+            # Apply temperature to the probabilities
+            next_probs[t] = current_probs[t] ** (1.0 / temp) if current_probs[t] > 0 else 0.0
+
+        # Normalize
+        total_prob = sum(next_probs.values())
+        if total_prob > 0:
+            current_probs = {t: p / total_prob for t, p in next_probs.items()}
+        else:
+            # Fallback to uniform if all probabilities somehow vanished
+            current_probs = {t: 1.0 / prime for t in range(prime)}
+    
+    collapsed_targets = sorted(list(current_probs.keys()))
+    collapsed_weights = [current_probs[t] for t in collapsed_targets]
+
+    # Exact ratio attainment for the sampler to avoid binomial distribution drift
+    # Distribute n_replace items among categories according to collapsed_weights using largest remainder method
+    expected_counts = [collapsed_weights[t] * n_replace for t in range(prime)]
+    integer_counts = [int(c) for c in expected_counts]
+    remainders = [(c - int(c), t) for t, c in enumerate(expected_counts)]
+
+    missing = n_replace - sum(integer_counts)
+    remainders.sort(key=lambda x: x[0], reverse=True)
+
+    for i in range(missing):
+        integer_counts[remainders[i][1]] += 1
+
+    synthetic_targets_to_inject = []
     for t in range(prime):
-        base_prob = freq.get(t, 1.0 / prime)
-        collapsed_probs[t] = base_prob ** (1.0 / temp)
-    
-    # Normalize
-    total_prob = sum(collapsed_probs.values())
-    collapsed_probs = {t: p / total_prob for t, p in collapsed_probs.items()}
-    
-    # Sample from collapsed distribution
-    collapsed_targets = list(collapsed_probs.keys())
-    collapsed_weights = [collapsed_probs[t] for t in collapsed_targets]
+        synthetic_targets_to_inject.extend([t] * integer_counts[t])
+
+    # Shuffle the injected targets securely
+    rng.shuffle(synthetic_targets_to_inject)
     
     new_pairs = list(pairs)
     new_targets = list(targets)
     
-    for idx in replace_idx:
-        # Replace target with sample from collapsed distribution
-        new_target = rng.choice(collapsed_targets, p=collapsed_weights)
-        new_targets[idx] = int(new_target)
-        # Optionally also corrupt the pair (simulating input collapse)
-        # For now, keep inputs clean — only corrupt outputs
+    for i, idx in enumerate(replace_idx):
+        new_targets[idx] = synthetic_targets_to_inject[i]
     
     return new_pairs, new_targets
 
 
 def apply_label_noise(
-    pairs: list, targets: list, prime: int,
+    pairs: List[Tuple[int, int]], targets: List[int], prime: int,
     noise_fraction: float, rng: np.random.RandomState,
-) -> Tuple[list, list]:
+) -> Tuple[List[Tuple[int, int]], List[int]]:
     """
     Replace a fraction of training labels with uniform random labels in [0, prime).
     The new label is drawn uniformly from the (prime-1) values different from the original
@@ -146,14 +176,14 @@ def apply_label_noise(
     return new_pairs, new_targets
 
 
-def get_all_conditions(prime: int = 59, seed: int = 42) -> dict:
+def get_all_conditions(prime: int = 59, seed: int = 42) -> Dict[str, DatasetConfig]:
     """Get all experimental conditions."""
     return {
-        "pure": DatasetConfig(prime=prime, collapse_level=0.0, seed=seed),
-        "low_collapse": DatasetConfig(prime=prime, collapse_level=0.05, collapse_severity=0.3, seed=seed),
-        "medium_collapse": DatasetConfig(prime=prime, collapse_level=0.15, collapse_severity=0.5, seed=seed),
-        "high_collapse": DatasetConfig(prime=prime, collapse_level=0.30, collapse_severity=0.7, seed=seed),
-        "severe_collapse": DatasetConfig(prime=prime, collapse_level=0.50, collapse_severity=0.9, seed=seed),
+        "pure": DatasetConfig(prime=prime, collapse_level=0.0, seed=get_condition_seed(seed, "pure")),
+        "low_collapse": DatasetConfig(prime=prime, collapse_level=0.05, collapse_severity=0.3, seed=get_condition_seed(seed, "low_collapse")),
+        "medium_collapse": DatasetConfig(prime=prime, collapse_level=0.15, collapse_severity=0.5, seed=get_condition_seed(seed, "medium_collapse")),
+        "high_collapse": DatasetConfig(prime=prime, collapse_level=0.30, collapse_severity=0.7, seed=get_condition_seed(seed, "high_collapse")),
+        "severe_collapse": DatasetConfig(prime=prime, collapse_level=0.50, collapse_severity=0.9, seed=get_condition_seed(seed, "severe_collapse")),
     }
 
 

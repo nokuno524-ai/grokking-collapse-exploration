@@ -76,9 +76,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from ..model import ModularArithmeticTransformer
+    from ..data import DatasetConfig, generate_modular_arithmetic
+    from ..train import compute_fourier_concentration, evaluate
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
@@ -242,7 +242,7 @@ def patch_state_dict(
                     f"shape mismatch on {k}: donor {tuple(donor_sd[k].shape)} "
                     f"vs base {tuple(base_sd[k].shape)}"
                 )
-            out[k] = donor_sd[k].clone()
+            out[k] = donor_sd[k].clone().to(dtype=base_sd[k].dtype, device=base_sd[k].device)
     return out
 
 
@@ -270,12 +270,16 @@ def make_loaders(
 
 def freeze_component(model: nn.Module, component: str) -> int:
     """Freeze all params whose state_dict-style name matches `component`."""
-    pat = COMPONENT_PATTERNS[component]
+    pat = COMPONENT_PATTERNS.get(component)
     n_frozen = 0
-    for name, p in model.named_parameters():
-        if re.match(pat, name):
-            p.requires_grad_(False)
-            n_frozen += 1
+    if pat:
+        for name, p in model.named_parameters():
+            if re.match(pat, name):
+                p.requires_grad_(False)
+                n_frozen += 1
+            else:
+                # Explicitly unfreeze others just in case, though usually defaults to requires_grad=True
+                p.requires_grad_(True)
     return n_frozen
 
 

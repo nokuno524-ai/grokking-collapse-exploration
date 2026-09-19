@@ -82,3 +82,30 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Circuit Transplants
+
+We provide utilities and a component-wise patch matrix to understand which model components carry "grokking capabilities" by performing surgical parameter swaps. This is used to test whether transplanting pure-data trained components into collapse-trained components restores zero-shot generalization or accelerates fine-tuning recovery.
+
+### Matrix Layout
+The patch matrix evaluates component importance via the following swap variations:
+- **Direction**: Pure -> Collapse (rescue generalization) and Collapse -> Pure (destroy generalization).
+- **Components**: `token_embed`, `pos_embed`, `ln` (LayerNorm), `L<l>_attn_qkv`, `L<l>_attn_out`, `L<l>_mlp`, `L<l>_ln1`, `L<l>_ln2`, and individual per-head components `L<l>_H<h>`.
+- **Metrics**: 0-step zero-shot testing accuracy, and K-step fine-tuned testing accuracy.
+
+### How to Run
+
+To run the patch matrix across multiple donor and recipient models:
+```bash
+python src/transplant/head_transplant.py \
+    --donor-runs results/multi_seed/42/pure results/multi_seed/43/pure \
+    --recipient-runs results/multi_seed/42/medium_collapse results/multi_seed/43/medium_collapse \
+    --output-dir analysis/head_transplant \
+    --rescue-steps 500
+```
+
+### Interpretation
+- `recovery_0_step`: Indicates immediate zero-shot generalization restoration from component transplantation. A value of ~1 means full grokking capabilities are stored in that component.
+- `recovery_k_step`: Indicates how fast grokking recovers during fine-tuning due to structural advantages inherent in the patched component.
+
+See `src/transplant/patching.py` for shape validation, slice-level, and module-level component swap implementations.

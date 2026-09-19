@@ -11,6 +11,24 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 3. **Noise ≡ "model-collapse" contamination at matched rate.** At noise=0.15, random-label noise and temperature-warped collapse contamination produce statistically indistinguishable test-acc and Fourier-concentration distributions (n=5 each). The original "collapse is a distinct phenomenon" framing is **refuted by our own baseline**.
 4. **Scarcity dissociation.** At 50% less training data, the model still groks and Fourier concentration is *higher* than at full data — while at 15% corrupted data it does not grok. This rules out "contamination = effective sample-size shrinkage" as the mechanism.
 
+## Statistical Analysis
+
+To establish the robustness of the grokking cliffs and ensure that results are not artifacts of a single seed, this repository includes a multi-seed harness with formal statistical testing:
+
+1. **Multi-seed Protocol**: We run multiple seeds (default: 5) per severity condition.
+2. **Change-point Detection**: We use a max-second-derivative (acceleration) detector on a smoothed (boxcar filter) test accuracy trajectory to locate the precise grokking cliff step. A run is considered to not have grokked within the budget if it never exceeds the target threshold (0.95).
+3. **Summary Statistics & Tests**:
+   - We report the median and IQR of the cliff step.
+   - We apply Holm-corrected pairwise Mann-Whitney U tests to compare cliff steps across severity conditions against the clean condition.
+   - We calculate the Spearman rank correlation (with permutation-based p-values) between final weight norm and whether grokking occurred.
+4. **Sensitivity**: A dedicated script verifies the robustness of the detected cliff steps across different smoothing window sizes and subsampled evaluation cadences.
+
+Run the multi-seed sweep and statistical aggregation using:
+```bash
+python src/run_multi_seed_stats.py --workers 4
+```
+This produces `results_aggregated.csv` and `stats_summary.json` in the results directory.
+
 ## Status (2026-05-10)
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.

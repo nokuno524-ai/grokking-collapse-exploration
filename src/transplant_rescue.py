@@ -79,10 +79,12 @@ try:
     from .model import ModularArithmeticTransformer
     from .data import DatasetConfig, generate_modular_arithmetic
     from .train import compute_fourier_concentration, evaluate
+    from .checkpoint import load_run
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
     from train import compute_fourier_concentration, evaluate  # type: ignore
+    from checkpoint import load_run  # type: ignore
 
 
 # Mapping from a short component name to the regex of state_dict keys it covers.
@@ -129,37 +131,6 @@ class VariantResult:
 def keys_for(component: str, sd: Dict[str, torch.Tensor]) -> List[str]:
     pat = COMPONENT_PATTERNS[component]
     return [k for k in sd.keys() if re.match(pat, k)]
-
-
-def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
-    """Return (state_dict, config) for the given run.
-    If step is None, picks the largest checkpoint."""
-    ckpts = sorted(run_dir.glob("checkpoint_*.pt"),
-                   key=lambda p: int(re.findall(r"\d+", p.name)[-1]))
-    if not ckpts:
-        raise FileNotFoundError(f"no checkpoint_*.pt in {run_dir}")
-    chosen: Optional[Path] = None
-    if step is not None:
-        for p in ckpts:
-            if int(re.findall(r"\d+", p.name)[-1]) == step:
-                chosen = p
-                break
-        if chosen is None:
-            raise FileNotFoundError(f"no checkpoint_{step}.pt in {run_dir}")
-    else:
-        chosen = ckpts[-1]
-    ckpt = torch.load(chosen, map_location="cpu", weights_only=False)
-    if isinstance(ckpt, dict) and "model_state" in ckpt:
-        sd = ckpt["model_state"]
-        cfg = ckpt.get("config", {})
-    else:
-        sd = ckpt
-        cfg = {}
-    res_path = run_dir / "results.json"
-    if not cfg and res_path.exists():
-        with res_path.open() as f:
-            cfg = json.load(f).get("config", {})
-    return sd, cfg
 
 
 def build_model(cfg: dict, device: torch.device) -> ModularArithmeticTransformer:
@@ -498,8 +469,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[info] device = {device}")
 
-    pure_sd, pure_cfg = load_run(args.pure_run, args.pure_step)
-    contam_sd, contam_cfg = load_run(args.contam_run, args.contam_step)
+    pure_model, pure_cfg = load_run(args.pure_run, args.pure_step, device=device)
+    contam_model, contam_cfg = load_run(args.contam_run, args.contam_step, device=device)
+    pure_sd = pure_model.state_dict()
+    contam_sd = contam_model.state_dict()
     print(f"[info] pure cfg: wd={pure_cfg.get('weight_decay')} "
           f"noise={pure_cfg.get('noise_fraction')} seed={pure_cfg.get('seed')}")
     print(f"[info] contam cfg: wd={contam_cfg.get('weight_decay')} "

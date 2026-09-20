@@ -82,3 +82,14 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Data Degradation Analysis
+
+To quantify how synthetic corpora degrade across recursive generations, we provide a standalone tool to compute data degradation metrics (entropy, distinct-n, compression ratio, JS divergence).
+
+Run the analysis CLI:
+```bash
+python src/cli_data_degradation.py --output-dir analysis/data_degradation --max-depth 10
+```
+This generates `data_degradation_metrics.csv` and summary plots in `analysis/data_degradation`.
+See `ANALYSIS_DATA_DEGRADATION.md` for interpretation and correlation with grokking outcomes.

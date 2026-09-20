@@ -6,9 +6,15 @@ to simulate model collapse.
 
 import torch
 import numpy as np
+import hashlib
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+
+def get_condition_seed(base_seed: int, condition_name: str) -> int:
+    """Derive a deterministic seed for a specific condition to prevent hash drift."""
+    h = hashlib.sha256(f"{base_seed}_{condition_name}".encode())
+    return int(h.hexdigest()[:8], 16)
 
 @dataclass
 class DatasetConfig:
@@ -105,7 +111,7 @@ def apply_collapse(
     collapsed_probs = {t: p / total_prob for t, p in collapsed_probs.items()}
     
     # Sample from collapsed distribution
-    collapsed_targets = list(collapsed_probs.keys())
+    collapsed_targets = sorted(list(collapsed_probs.keys()))
     collapsed_weights = [collapsed_probs[t] for t in collapsed_targets]
     
     new_pairs = list(pairs)

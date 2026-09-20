@@ -16,11 +16,11 @@ from typing import Optional, List
 try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
-    from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions, get_condition_seed
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
-    from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions, get_condition_seed
 
 
 @dataclass
@@ -117,8 +117,9 @@ def train(config: TrainConfig) -> TrainState:
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
     
     # Set seeds
-    torch.manual_seed(config.seed)
-    torch.cuda.manual_seed_all(config.seed)
+    cond_seed = get_condition_seed(config.seed, config.condition_name)
+    torch.manual_seed(cond_seed)
+    torch.cuda.manual_seed_all(cond_seed)
 
     # Generate data
     data_config = DatasetConfig(
@@ -127,15 +128,17 @@ def train(config: TrainConfig) -> TrainState:
         collapse_level=config.collapse_level,
         collapse_severity=config.collapse_severity,
         noise_fraction=config.noise_fraction,
-        seed=config.seed,
+        seed=cond_seed,
     )
     train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
     
     train_dataset = TensorDataset(train_in, train_tgt)
     test_dataset = TensorDataset(test_in, test_tgt)
 
+    # Reset global seed before DataLoader to avoid cross-condition batch leaks
+    torch.manual_seed(cond_seed)
     loader_generator = torch.Generator()
-    loader_generator.manual_seed(config.seed)
+    loader_generator.manual_seed(cond_seed)
     train_loader = DataLoader(
         train_dataset, batch_size=config.batch_size, shuffle=True,
         generator=loader_generator,
@@ -207,7 +210,7 @@ def train(config: TrainConfig) -> TrainState:
             state.fourier_concentration = compute_fourier_concentration(model)
             
             # Detect grokking
-            if test_acc >= state.grokking_threshold and not state.grokked:
+            if test_acc >= state.grokking_threshold - 1e-6 and not state.grokked:
                 state.grokked = True
                 state.grokking_step = step
                 print(f"🎉 GROKKING at step {step}! Test acc: {test_acc:.4f}")
@@ -260,8 +263,18 @@ def train(config: TrainConfig) -> TrainState:
     }
     
     results_path = output_dir / "results.json"
+    # Round floats for deterministic hashing
+    def round_floats(obj):
+        if isinstance(obj, float):
+            return round(obj, 6)
+        elif isinstance(obj, dict):
+            return {k: round_floats(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [round_floats(i) for i in obj]
+        return obj
+
     with open(results_path, "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(round_floats(results), f, indent=2, sort_keys=True)
     
     print(f"\nResults saved to {results_path}")
     print(f"Grokked: {state.grokked} at step {state.grokking_step}")

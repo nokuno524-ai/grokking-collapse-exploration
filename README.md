@@ -82,3 +82,41 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Ensemble Sweeps
+
+To account for run-to-run variance in grokking behavior, this repository provides a systematic multi-seed ensemble runner and censoring-aware aggregation tools.
+
+### Matrix Format
+The ensemble scripts use a configuration matrix consisting of `collapse severity` × `random seed`.
+By default, the runner generates an execution matrix using 5 seeds over the 5 standard collapse conditions.
+
+### Running the Ensemble
+Use the `src/ensemble/runner.py` script to generate or execute the tasks.
+
+**Run sequentially locally:**
+```bash
+python src/ensemble/runner.py --mode local --seeds 42,43,44,45,46
+```
+
+**Generate an SLURM sbatch script:**
+```bash
+python src/ensemble/runner.py --mode sbatch --seeds 42,43,44,45,46
+sbatch slurm/ensemble_sweep.sbatch
+```
+The runner is inherently resumable: if a cell was interrupted, it will only execute tasks lacking a `results.json`.
+
+### Aggregation and Interpretation
+Because some runs might never grok within the computational budget, we treat such non-grokked runs as right-censored in a Kaplan-Meier survival analysis.
+Survival in this context means "has not grokked yet".
+
+**Generate a tidy CSV of statistics:**
+```bash
+python src/ensemble/aggregation.py --results-dir results/ensemble_sweep
+```
+
+**Generate survival curve plots with confidence bands:**
+```bash
+python src/ensemble/plot.py --results-dir results/ensemble_sweep
+```
+The plot displays the "Probability of Grokking" (1 - survival probability) over the number of training steps, properly accounting for runs that never grok.

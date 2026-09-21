@@ -38,6 +38,17 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Attention Extraction & Visualization
+# Attention metrics and atlases are automatically extracted and saved during training in `src/train.py`
+# at the configured `save_every` interval. To generate an HTML report comparing two conditions:
+
+python scripts/aggregate_report.py \
+    --dir1 results/pure \
+    --name1 "Grokked" \
+    --dir2 results/severe_collapse \
+    --name2 "Collapsed" \
+    --output analysis/attention_comparison_report.html
 ```
 
 ## Architecture

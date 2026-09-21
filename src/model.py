@@ -76,10 +76,10 @@ class ModularArithmeticTransformer(nn.Module):
         Forward pass.
         
         Args:
-            x: Input tensor of shape (batch, 2) with values in [0, prime)
+            x (torch.Tensor): Input tensor of shape (batch, 2) with values in [0, prime)
         
         Returns:
-            Logits of shape (batch, prime)
+            torch.Tensor: Logits of shape (batch, prime)
         """
         batch_size = x.shape[0]
         
@@ -104,7 +104,12 @@ class ModularArithmeticTransformer(nn.Module):
         return logits
     
     def get_weight_norm(self) -> float:
-        """Get total L2 norm of all parameters."""
+        """
+        Get total L2 norm of all parameters.
+
+        Returns:
+            float: Total L2 norm of the model's parameters.
+        """
         return sum(p.norm().item() ** 2 for p in self.parameters()) ** 0.5
     
     def get_embedding_fourier_spectrum(self) -> torch.Tensor:
@@ -118,7 +123,12 @@ class ModularArithmeticTransformer(nn.Module):
         return spectrum
     
     def get_embedding_rank(self) -> float:
-        """Compute effective rank of the embedding matrix."""
+        """
+        Compute effective rank of the embedding matrix using singular values entropy.
+
+        Returns:
+            float: Effective rank of the token embedding matrix.
+        """
         W = self.token_embed.weight.detach()
         s = torch.linalg.svdvals(W)
         s = s / s.sum()

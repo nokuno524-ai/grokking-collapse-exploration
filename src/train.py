@@ -44,6 +44,9 @@ class TrainConfig:
     log_every: int = 50
     save_every: int = 5000
     
+    # Attention Extraction
+    attn_eval_samples: int = 64
+
     # Data
     collapse_level: float = 0.0
     collapse_severity: float = 0.5
@@ -90,8 +93,18 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
     return (top_energy / total_energy).item()
 
 
-def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple[float, float]:
+    """
+    Evaluate model, return (loss, accuracy).
+
+    Args:
+        model (nn.Module): The model to evaluate.
+        dataloader (DataLoader): DataLoader for evaluation data.
+        device (torch.device): Device to evaluate on.
+
+    Returns:
+        tuple[float, float]: Mean loss and accuracy over the dataset.
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -110,8 +123,34 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
     return total_loss / total, correct / total
 
 
+import csv
+import numpy as np
+
+try:
+    from .attention_extraction import extract_attention
+    from .analysis.attention_metrics import (
+        compute_attention_entropy,
+        compute_diagonal_mass,
+        compute_head_specialization
+    )
+except ImportError:
+    from attention_extraction import extract_attention
+    from analysis.attention_metrics import (
+        compute_attention_entropy,
+        compute_diagonal_mass,
+        compute_head_specialization
+    )
+
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment.
+
+    Args:
+        config (TrainConfig): Training configuration.
+
+    Returns:
+        TrainState: The final training state, including metrics history.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
@@ -165,6 +204,11 @@ def train(config: TrainConfig) -> TrainState:
     output_dir = Path(config.output_dir) / config.condition_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Setup attention extraction inputs and metrics logging
+    attn_eval_inputs = torch.randint(0, config.prime, (config.attn_eval_samples, 2), device=device)
+    attn_metrics_file = output_dir / "attention_metrics.csv"
+    attn_metrics_records = []
+
     # Training loop
     dataloader_iter = iter(train_loader)
     start_time = time.time()
@@ -236,7 +280,7 @@ def train(config: TrainConfig) -> TrainState:
                     f"time={elapsed:.1f}s"
                 )
         
-        # Save checkpoint
+        # Save checkpoint & Extract Attention
         if step % config.save_every == 0:
             ckpt_path = output_dir / f"checkpoint_{step}.pt"
             torch.save({
@@ -245,7 +289,41 @@ def train(config: TrainConfig) -> TrainState:
                 "optimizer_state": optimizer.state_dict(),
                 "config": asdict(config),
             }, ckpt_path)
+
+            # Extract attention
+            model.eval()
+            with extract_attention(model) as extracted:
+                with torch.no_grad():
+                    _ = model(attn_eval_inputs)
+
+            patterns_to_save = {}
+            for layer_name, patterns in extracted.items():
+                if patterns:
+                    attn = patterns[0]  # shape (batch, n_heads, tgt_len, src_len)
+                    patterns_to_save[layer_name] = attn
+
+                    entropy = compute_attention_entropy(attn).mean()
+                    diag_mass = compute_diagonal_mass(attn).mean()
+                    spec = compute_head_specialization(attn)
+
+                    attn_metrics_records.append({
+                        "step": step,
+                        "layer": layer_name,
+                        "entropy": entropy,
+                        "diagonal_mass": diag_mass,
+                        "head_specialization": spec
+                    })
+
+            if patterns_to_save:
+                np.savez_compressed(output_dir / f"attention_step_{step}.npz", **patterns_to_save)
     
+    # Save attention metrics
+    if attn_metrics_records:
+        with open(attn_metrics_file, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["step", "layer", "entropy", "diagonal_mass", "head_specialization"])
+            writer.writeheader()
+            writer.writerows(attn_metrics_records)
+
     # Save final results
     results = {
         "config": asdict(config),

@@ -38,7 +38,19 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Ablation Atlas Tooling
+python src/analysis/atlas_analysis.py \
+    --base-run results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --donor-run results/exp_c_grid/wd1/noise0/seed_42 \
+    --out-dir analysis/atlas
 ```
+
+## Tools API
+
+The repository provides granular mechanistic interpretability tools:
+- `src.transplant.atlas`: Provides systematic component-wise intervention mapping. Functions include `patch_attention_head`, `patch_mlp_neuron`, and `patch_layer` to apply `transplant`, `zero`, or `mean` ablations per component zero-shot.
+- Statistical significance is robustly mapped using Benjamini-Hochberg corrected p-values and boot-strapped confidence intervals in `src.analysis.atlas_analysis`.
 
 ## Architecture
 

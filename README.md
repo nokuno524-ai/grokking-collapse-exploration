@@ -82,3 +82,17 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Attention Visualization
+
+You can render per-layer, per-head attention heatmaps and plot the evolution of attention entropy over training steps. This is useful for observing circuit formation.
+
+```bash
+# Visualize attention for a single step
+python scripts/visualize_attention.py --run-dir results/exp_c_grid/wd1/noise0/seed_42 --step 0
+
+# Sweep through all checkpoints to produce an entropy timeline
+python scripts/visualize_attention.py --run-dir results/exp_c_grid/wd1/noise0/seed_42 --sweep
+```
+
+The script will save heatmaps and timeline plots to `analysis/attention/` by default. Heatmaps show attention weights distributed across the key-query sequence, while the timeline plots the mean entropy of attention distributions, helping identify sharp transitions characteristic of grokking cliffs.

@@ -61,8 +61,12 @@ class ModularArithmeticTransformer(nn.Module):
         
         self._init_weights()
     
-    def _init_weights(self):
-        """Initialize weights with small random values."""
+    def _init_weights(self) -> None:
+        """Initialize weights with small random values.
+
+        Applies a normal distribution (std=0.02) to Linear and Embedding weights.
+        Zeros out Linear biases.
+        """
         for module in self.modules():
             if isinstance(module, nn.Linear):
                 nn.init.normal_(module.weight, std=0.02)
@@ -130,7 +134,14 @@ GrokkingTransformer = ModularArithmeticTransformer
 
 
 def count_parameters(model: nn.Module) -> int:
-    """Count trainable parameters."""
+    """Count trainable parameters in a PyTorch module.
+
+    Args:
+        model: The PyTorch module.
+
+    Returns:
+        The total number of parameters that require gradients.
+    """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 

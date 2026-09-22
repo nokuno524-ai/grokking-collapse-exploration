@@ -225,8 +225,18 @@ def patch_state_dict(
     rng: Optional[torch.Generator] = None,
 ) -> Dict[str, torch.Tensor]:
     """Return a new state_dict = base, with `component` replaced by donor's.
-    If randomize=True, replace with a random-orthonormal-basis version of base
-    (specificity control); donor is unused in that path."""
+
+    Args:
+        base_sd: The original state dict to copy from.
+        donor_sd: The state dict to copy the component from.
+        component: The short name of the component to replace.
+        randomize: If True, replace with a random-orthonormal-basis version of base
+            (specificity control); donor is unused in that path.
+        rng: Random number generator used if randomize=True.
+
+    Returns:
+        A patched state_dict.
+    """
     out = {k: v.clone() for k, v in base_sd.items()}
     if randomize:
         if rng is None:
@@ -308,7 +318,20 @@ def rescue_train(
     lr: float,
     weight_decay: float,
 ) -> Dict[str, float]:
-    """Train trainable params (those with requires_grad=True) for `steps` steps."""
+    """Train trainable params (those with requires_grad=True) for `steps` steps.
+
+    Args:
+        model: The PyTorch module to train.
+        train_loader: DataLoader for the training set.
+        test_loader: DataLoader for the test set (used for final eval).
+        device: Torch device to use.
+        steps: Number of training steps.
+        lr: Learning rate.
+        weight_decay: Weight decay.
+
+    Returns:
+        A dictionary of evaluation metrics after retraining.
+    """
     trainable = [p for p in model.parameters() if p.requires_grad]
     if not trainable:
         return evaluate_model(model, train_loader, test_loader, device)

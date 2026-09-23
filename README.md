@@ -25,10 +25,16 @@ uv venv .venv && source .venv/bin/activate
 uv pip install torch numpy matplotlib scipy
 
 # Single training run
-python src/train.py --condition pure --max-steps 50000
+python src/train.py --condition pure --max-steps 50000 --save-every 1000
+
+# Extract and visualize attention patterns from that run (generates heatmaps & animation)
+python scripts/visualize_attention.py --run-dir results/pure_100.0/ --output-dir analysis/attention/
 
 # Reproduce the wd × noise grid (SLURM array, 90 jobs)
 sbatch slurm/exp_c_grid.sbatch
+
+# Compare cliff timing distributions across the grid
+python scripts/compare_cliffs.py --results-dir results/exp_c_grid/wd1/ --method plateau --base-condition pure
 
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
@@ -64,7 +70,16 @@ src/
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)
   causal_circuit_rescue.py # observational per-matrix rank trajectory
   progress_measures.py     # Chan-style progress measures, leading-indicator variant
-  analysis.py              # per-condition plot/table generation
+  analysis_legacy.py       # per-condition plot/table generation
+  attention_extraction.py  # attention weights context manager
+  analysis/
+    grok_detector/         # cliff statistics and changepoint detection
+scripts/
+  visualize_attention.py   # per-layer/head heatmaps, animations, and HTML gallery
+  compare_cliffs.py        # statistical hypothesis tests on cliff timings across regimes
+docs/
+  grokking_stats.md        # documentation for changepoint statistics
+tests/                     # unit tests for detectors, stats, and attention extraction
   contamination/           # toy contamination experiment
   contamination_real/      # GPT-2 medium + LoRA on contaminated OWT (Exp B)
 

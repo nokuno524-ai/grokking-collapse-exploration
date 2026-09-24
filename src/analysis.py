@@ -60,8 +60,15 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
                 if not history:
                     continue
                 
-                steps = [e["step"] for e in history]
-                values = [e.get(metric, 0) for e in history]
+                steps = []
+                values = []
+                for e in history:
+                    val = e.get(metric, 0)
+                    if val is not None and not (isinstance(val, float) and np.isnan(val)):
+                        steps.append(e["step"])
+                        values.append(val)
+                if not steps:
+                    continue
                 color = colors.get(condition_dir.name, "gray")
                 ax.plot(steps, values, label=condition_dir.name, color=color, alpha=0.8)
             except Exception:
@@ -97,8 +104,12 @@ def plot_grokking_comparison(results_dir: Path, output_path: Optional[Path] = No
                 data = json.load(f)
             conditions.append(condition_dir.name.replace("_", "\n"))
             grokking_steps.append(data.get("grokking_step") or 0)
-            test_accs.append(data.get("final_test_acc", 0))
-            fourier_concs.append(data.get("final_fourier_concentration", 0))
+
+            acc = data.get("final_test_acc", 0)
+            test_accs.append(acc if acc is not None else 0.0)
+
+            fourier = data.get("final_fourier_concentration", 0)
+            fourier_concs.append(fourier if fourier is not None else 0.0)
         except Exception:
             pass
     

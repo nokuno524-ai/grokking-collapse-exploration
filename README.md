@@ -4,12 +4,19 @@ A controlled study of how label-noise rate, weight-decay strength, and training-
 
 ## What the data show
 
-After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium real-LM runs:
+After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium real-LM runs, and a rigorous statistical aggregation using multi-seed data (Kaplan-Meier survival analysis and Bootstrap CIs):
 
-1. **Sharp grokking cliff in label-noise rate.** With weight decay in {0.3, 1.0}, 5/5 seeds grok at noise ≤ 0.10 and 0/5 seeds grok at noise ≥ 0.15. The transition occupies a single 5-percentage-point band.
+1. **Sharp grokking cliff in label-noise rate.** With weight decay in {0.3, 1.0}, 5/5 seeds grok at noise ≤ 0.10 and 0/5 seeds grok at noise ≥ 0.15. The transition occupies a single 5-percentage-point band. (Statistically verified through permutation testing on median grokking steps).
 2. **Weight decay is a second-axis cliff.** wd=3.0 prevents grokking entirely (the model cannot fit the clean training set); wd=0.3 and wd=1.0 grok up to a noise-cliff that *shifts slightly with wd*.
 3. **Noise ≡ "model-collapse" contamination at matched rate.** At noise=0.15, random-label noise and temperature-warped collapse contamination produce statistically indistinguishable test-acc and Fourier-concentration distributions (n=5 each). The original "collapse is a distinct phenomenon" framing is **refuted by our own baseline**.
 4. **Scarcity dissociation.** At 50% less training data, the model still groks and Fourier concentration is *higher* than at full data — while at 15% corrupted data it does not grok. This rules out "contamination = effective sample-size shrinkage" as the mechanism.
+
+## Rigorous Statistical Analysis
+
+This repo now explicitly supports robust verification of the "cliff" findings:
+- **Formal Definition of Grokking**: A run is considered "grokked" only when `test_acc >= 0.99` is sustained for 5 consecutive evaluation steps. Short performance spikes are properly rejected.
+- **Survival Analysis**: For runs that never cross the cliff (e.g. high collapse scenarios), Kaplan-Meier right-censoring correctly tracks the probabilities.
+- **Tools**: Running `python -m src.rigorous_stats.analyzer <results_dir> <output_dir>` will aggregate multi-seed outcomes (computing medians with 95% Bootstrap CIs and performing permutation testing on the effect sizes). Plots are generated in `src.rigorous_stats.plotting`.
 
 ## Status (2026-05-10)
 

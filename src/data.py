@@ -147,7 +147,16 @@ def apply_label_noise(
 
 
 def get_all_conditions(prime: int = 59, seed: int = 42) -> dict:
-    """Get all experimental conditions."""
+    """
+    Get all experimental conditions.
+
+    Args:
+        prime (int): Modulo prime number.
+        seed (int): Random seed.
+
+    Returns:
+        dict: Mapping of condition names to their respective DatasetConfig objects.
+    """
     return {
         "pure": DatasetConfig(prime=prime, collapse_level=0.0, seed=seed),
         "low_collapse": DatasetConfig(prime=prime, collapse_level=0.05, collapse_severity=0.3, seed=seed),

@@ -34,11 +34,29 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python src/transplant/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Systematic circuit transplant sweep (Localization Matrix)
+python src/transplant/sweep.py \
+    --base-dir results/exp_c_grid/wd1 \
+    --output-dir analysis/transplant_sweep
 ```
+
+## Systematic Transplant Methodology
+
+To localize where generalization fails under varying degrees of model collapse and label noise, we utilize a **Systematic Transplant Sweep**. This framework systematically grafts components from grokked "donor" networks into collapsed "recipient" networks. By observing zero-shot test accuracy recovery, we can localize the exact circuitry responsible for generalization failure.
+
+- **Module-Level Swaps:** Granular interventions replacing entire modules (e.g., `self_attn`, `linear1`, `pos_embed`).
+- **Head-Level Swaps:** Fine-grained slicing of fused query-key-value projections and output projections to pinpoint specific attention heads.
+- **Localization Matrix:** A comprehensive matrix plotting donor conditions vs. recipient conditions for every module, quantifying the accuracy change (rescue effect).
+
+**Interpretation Guide for the Localization Matrix:**
+- **Positive Deltas (Blue):** Pasting the donor component significantly recovered test accuracy, meaning the *recipient* failed to learn this specific module correctly, but the rest of the recipient network can successfully utilize a corrected component. This directly ties into weight-norm collapse findings, showing where representation learning stalled.
+- **Near-Zero Deltas (White):** The swap had no effect. Either the component is not the bottleneck, or the entire network is too misaligned to accept isolated grafted weights.
+- **Negative Deltas (Red):** The donor component *destroyed* whatever marginal performance the recipient had, indicating complex cross-module dependencies or incompatible feature bases.
 
 ## Architecture
 
@@ -60,7 +78,10 @@ src/
   run_scarcity_baseline.py # train-fraction baseline
   run_multi_seed.py        # 5-seed × 5-condition repeat
   run_prime_sweep.py       # second-prime brittleness check (NEW)
-  transplant_rescue.py     # surgical-circuit transplant (Exp A, NEW)
+  transplant/              # surgical-circuit transplant (Exp A, NEW)
+    transplant_rescue.py
+    sweep.py               # systematic transplant matrix automation
+    patching.py            # fine-grained head/module state-dict patching
   threshold_theory.py      # closed-form η*(λ, p, d) + empirical fit (Exp C, NEW)
   causal_circuit_rescue.py # observational per-matrix rank trajectory
   progress_measures.py     # Chan-style progress measures, leading-indicator variant

@@ -69,7 +69,8 @@ class TrainState:
     fourier_concentration: float = 0.0
     grokked: bool = False
     grokking_step: Optional[int] = None
-    grokking_threshold: float = 0.95
+    grokking_threshold: float = 0.99
+    sustained_steps: int = 0
     history: List[dict] = field(default_factory=list)
 
 
@@ -91,7 +92,17 @@ def compute_fourier_concentration(model: ModularArithmeticTransformer, top_k: in
 
 
 def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> tuple:
-    """Evaluate model, return (loss, accuracy)."""
+    """
+    Evaluate the model on a dataloader.
+
+    Args:
+        model: The transformer model to evaluate.
+        dataloader: The dataloader providing input and target batches.
+        device: The device to run evaluation on.
+
+    Returns:
+        tuple: (average loss, overall accuracy)
+    """
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -111,7 +122,15 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
 
 
 def train(config: TrainConfig) -> TrainState:
-    """Run a single training experiment."""
+    """
+    Run a single training experiment based on the given configuration.
+
+    Args:
+        config: Configuration for the training run.
+
+    Returns:
+        TrainState: The final state object tracking metrics and grokking step.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on {device}")
     print(f"Condition: {config.condition_name}, collapse_level={config.collapse_level}")
@@ -207,10 +226,15 @@ def train(config: TrainConfig) -> TrainState:
             state.fourier_concentration = compute_fourier_concentration(model)
             
             # Detect grokking
-            if test_acc >= state.grokking_threshold and not state.grokked:
-                state.grokked = True
-                state.grokking_step = step
-                print(f"🎉 GROKKING at step {step}! Test acc: {test_acc:.4f}")
+            if not state.grokked:
+                if test_acc >= state.grokking_threshold:
+                    state.sustained_steps += 1
+                    if state.sustained_steps >= 5:
+                        state.grokked = True
+                        state.grokking_step = step
+                        print(f"🎉 GROKKING at step {step}! Test acc: {test_acc:.4f} sustained for 5 evaluations.")
+                else:
+                    state.sustained_steps = 0
             
             # Log
             entry = {
@@ -270,7 +294,16 @@ def train(config: TrainConfig) -> TrainState:
 
 
 def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
-    """Run all experimental conditions."""
+    """
+    Run the training loop sequentially across all predefined experimental conditions.
+
+    Args:
+        output_dir: Root directory for saving results.
+        max_steps: Maximum number of training steps per condition.
+
+    Returns:
+        dict: A summary mapping condition names to their final results.
+    """
     conditions = get_all_conditions()
     results = {}
     

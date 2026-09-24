@@ -28,7 +28,13 @@ def _ordered_condition_dirs(results_dir: Path) -> List[Path]:
 
 
 def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = None):
-    """Plot training trajectories for all conditions."""
+    """
+    Plot training trajectories for all conditions.
+
+    Args:
+        results_dir (Path): Directory containing condition subdirectories with results.json.
+        output_path (Optional[Path]): Path to save the generated plot. If None, saves in results_dir.
+    """
     if not HAS_MATPLOTLIB:
         print("matplotlib not available, skipping plots")
         return
@@ -82,7 +88,13 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
 
 
 def plot_grokking_comparison(results_dir: Path, output_path: Optional[Path] = None):
-    """Generate a bar chart comparing grokking outcomes."""
+    """
+    Generate a bar chart comparing grokking outcomes.
+
+    Args:
+        results_dir (Path): Directory containing condition subdirectories with results.json.
+        output_path (Optional[Path]): Path to save the generated plot. If None, saves in results_dir.
+    """
     if not HAS_MATPLOTLIB:
         return
     

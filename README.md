@@ -40,6 +40,29 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+
+
+## Attention Visualization & Mechanistic Analysis
+
+To investigate how collapse prevents grokking, we provide a visualization suite that tracks attention pattern formation over time.
+You can use it to extract and render per-head heatmaps, head-similarity matrices, and aggregate entropy trajectories:
+
+```bash
+# Visualize attention patterns across training checkpoints
+python scripts/visualize_attention.py \
+    --directory results/exp_c_grid/wd1/noise0/seed_42 \
+    --output-dir analysis/attention/pure
+
+python scripts/visualize_attention.py \
+    --directory results/exp_c_grid/wd1/noise0.15/seed_42 \
+    --output-dir analysis/attention/collapse
+```
+
+**What to look for**:
+- **Heatmaps**: In grokking runs (e.g., pure), attention patterns typically specialize into structured operations.
+- **Head Similarity**: Pure runs often show stable attention distributions after grokking, visualized as a block structure in the similarity matrix.
+- **Entropy Trajectories**: Collapse prevents grokking by inhibiting the formation of these structured attention patterns, which manifests as higher or disorganized attention entropy over time compared to clean runs.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

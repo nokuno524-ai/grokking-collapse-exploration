@@ -82,3 +82,32 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Attention Visualization Workflow
+
+The repository includes a suite of tools for extracting and visualizing per-layer, per-head attention matrices across training steps.
+
+### 1. Extract and Cache Attention
+To extract attention metrics over time and save the raw matrices to `.npz` files (optional for some tools, but good for offline analysis):
+
+```bash
+python scripts/vis_attention.py --run-dirs results/my_run_pure results/my_run_contam --output-dir analysis/my_run_attention --heatmaps
+```
+
+This script will automatically load all checkpoints in `results/my_run`, compute attention patterns on a deterministic test batch, and output:
+- `attention_metrics.csv` containing step-wise entropy and diagonal dominance per head.
+- `mean_entropy_over_time.png` showing the trend of entropy per head.
+- `diagonal_dominance_over_time.png` showing how much attention is focused on the a->a and b->b diagonal over time.
+
+### 2. Generate Step-Indexed Animations
+To visualize how the attention pattern of a single sequence evolves across training:
+
+```bash
+python scripts/vis_attention.py --run-dirs results/my_run --output-dir analysis/my_run_attention --animate
+```
+This generates `attention_evolution.gif` containing an animated heatmap of all heads for a fixed sequence.
+
+### 3. Contrasting Regimes
+When comparing a grokking run (e.g. `pure`) to a collapsed run (e.g. `noise=0.15`), look for the following in the attention visualizations:
+- **Grokking runs:** Often show sudden phase transitions in attention entropy (dropping sharply) as specific heads specialize into circuits.
+- **Collapsed runs:** Attention matrices may remain high-entropy (uniform) or fail to converge to sparse, interpretable patterns. Diagonal dominance may never form.

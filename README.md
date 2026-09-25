@@ -33,12 +33,28 @@ sbatch slurm/exp_c_grid.sbatch
 # Reproduce the noise / scarcity / multi-seed baselines
 sbatch slurm/baselines.sh
 
-# Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+# Surgical transplant rescue
+python src/transplant/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
 ```
+
+## Transplant Robustness Suite & Causal Ablation Protocol
+
+We provide tools to test the robustness of circuit transplants (e.g. attention heads, MLPs) from a pure "grokked" model into a contaminated model.
+
+- **Transplant Sweep:** `src/transplant/sweep.py` provides `run_sweep` and the `graft_context` context manager to safely swap components. It supports systematic evaluations across matched seeds using control interventions ("sham" self-graft, "random" orthonormal basis, and "donor" true graft). Success rates are aggregated with bootstrap confidence intervals into a JSON and Markdown table.
+- **Causal Lesioning/Ablation:** `src/transplant/atlas.py` provides targeted ablation controls (`zero_ablate_component`, `mean_ablate_component`). To prove a behavior causally depends on the grafted component, we first verify the behavior appears when the component is grafted, and then verify it disappears when the *grafted component is ablated* (zeroed or mean-ablated).
+
+## Reading Result Tables
+
+- **Test Acc (Mean)**: The mean test accuracy of the model after the specific intervention (e.g. donor graft or control).
+- **Test Acc (CI)**: Bootstrap 95% confidence interval for test accuracy.
+- **Controls**:
+  - `donor`: The true surgical transplant from the donor model.
+  - `sham`: A self-graft (replacing a component with the recipient's own component).
+  - `random`: Swapping in a random orthonormal basis matrix of the exact same shape and spectrum as the recipient component (specificity control).
 
 ## Architecture
 

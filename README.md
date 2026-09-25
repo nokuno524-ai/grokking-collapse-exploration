@@ -38,7 +38,22 @@ python src/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Attention Visualization (extract patterns for a run over checkpoints)
+python src/attention_visualizer.py \
+    --run-dir results/pure \
+    --prompt 7 13 \
+    --output-dir analysis/attention_vis
 ```
+
+### Attention Visualization Interpretation Guide
+
+The `attention_visualizer.py` tool generates:
+- **Attention Heatmaps (`heatmap_step_*.png`)**: Shows the per-head attention matrices over the symbolic sequence (e.g. `(a, b)` tokens). Look for crisp diagonal or off-diagonal patterns indicating circuit formation. Collapsed models often display uniform (diffuse) attention or focus heavily on irrelevant features.
+- **Attention Entropy Trajectory (`entropy_trajectory.png`)**: Plots Shannon entropy of the attention distribution across training steps.
+  - **Pre-Grokking**: Entropy may remain high (uniform attention) or drift slightly.
+  - **Grokking Cliff**: A sharp drop (specialization) or rise (diffusing across critical components) in entropy often correlates perfectly with the test accuracy cliff.
+  - **Collapse**: Trajectories may plateau at high entropy (failure to specialize) or plummet prematurely into degenerate states.
 
 ## Architecture
 

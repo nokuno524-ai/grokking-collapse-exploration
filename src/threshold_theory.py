@@ -118,17 +118,40 @@ def parse_grid(grid_dir: Path) -> List[dict]:
                 if not res_path.exists():
                     continue
                 with res_path.open() as f:
-                    data = json.load(f)
+                    try:
+                        data = json.load(f)
+                    except json.JSONDecodeError:
+                        continue
+
+                # Deduplicate seeds, keep the last one if it was somehow duplicated in parsing (shouldn't happen here but safe)
+                test_acc = data.get("final_test_acc", 0.0)
+                if test_acc is None or math.isnan(test_acc): test_acc = 0.0
+
+                train_acc = data.get("final_train_acc", 0.0)
+                if train_acc is None or math.isnan(train_acc): train_acc = 0.0
+
+                fourier = data.get("final_fourier_concentration", 0.0)
+                if fourier is None or math.isnan(fourier): fourier = 0.0
+
                 rows.append({
                     "wd": wd,
                     "noise": noise,
                     "seed": seed,
                     "grokked": bool(data.get("grokked", False)),
-                    "final_test_acc": float(data.get("final_test_acc", 0.0)),
-                    "final_train_acc": float(data.get("final_train_acc", 0.0)),
-                    "final_fourier": float(data.get("final_fourier_concentration", 0.0)),
+                    "final_test_acc": float(test_acc),
+                    "final_train_acc": float(train_acc),
+                    "final_fourier": float(fourier),
                 })
-    return rows
+
+    # Deduplicate rows by (wd, noise, seed) - take first encountered
+    seen = set()
+    deduped = []
+    for r in rows:
+        k = (r["wd"], r["noise"], r["seed"])
+        if k not in seen:
+            seen.add(k)
+            deduped.append(r)
+    return deduped
 
 
 def per_seed_threshold(rows: List[dict]) -> Dict[Tuple[float, int], float]:

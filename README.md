@@ -40,6 +40,15 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Statistical Protocol
+
+To address the inherent variability of grokking, this repository implements a rigorous statistical protocol (`src/rigorous_stats/`):
+
+- **Cliff Detection Methods:** Three independent methods are available: maximum 2nd derivative of smoothed test accuracy, sigmoid-fit changepoint detection, and threshold crossing (with sustained checks).
+- **Uncertainty Quantification:** Cliff detection returns an uncertainty band via sensitivity analysis (e.g., varying smoothing window sizes or subsampling).
+- **Effect Sizes & Testing:** Distributions of grokking steps are compared using Cohen's d and two-sided Mann-Whitney U tests. Grokking rates are reported with 95% binomial confidence intervals (Wilson score).
+- **Sample Sizes:** For fully powered comparisons (detecting shifts of ~10% in the cliff position), we recommend n ≥ 5 seeds per condition.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

@@ -84,8 +84,12 @@ def collect_runs():
                 if not results_path.exists():
                     continue
                 with results_path.open() as f:
-                    data = json.load(f)
+                    try:
+                        data = json.load(f)
+                    except json.JSONDecodeError:
+                        continue
                 history = data.get("history", []) or []
+
                 rows.append({
                     "wd": wd,
                     "noise": noise,
@@ -102,7 +106,16 @@ def collect_runs():
                     "history": history,
                     "results_path": str(results_path),
                 })
-    return rows
+
+    # Deduplicate seeds just in case
+    seen = set()
+    deduped = []
+    for r in rows:
+        k = (r["wd"], r["noise"], r["seed"])
+        if k not in seen:
+            seen.add(k)
+            deduped.append(r)
+    return deduped
 
 
 def trajectory_signature(history):

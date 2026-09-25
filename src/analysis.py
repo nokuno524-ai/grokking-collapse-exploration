@@ -62,10 +62,14 @@ def plot_training_trajectory(results_dir: Path, output_path: Optional[Path] = No
                 
                 steps = [e["step"] for e in history]
                 values = [e.get(metric, 0) for e in history]
+                if any(v is None or np.isnan(v) for v in values):
+                    # Filter out none/nan values for plotting
+                    steps = [s for s, v in zip(steps, values) if v is not None and not np.isnan(v)]
+                    values = [v for v in values if v is not None and not np.isnan(v)]
                 color = colors.get(condition_dir.name, "gray")
                 ax.plot(steps, values, label=condition_dir.name, color=color, alpha=0.8)
-            except Exception:
-                pass
+            except Exception as ex:
+                print(f"Error plotting {condition_dir}: {ex}")
         
         ax.set_title(title)
         ax.set_xlabel("Step")
@@ -97,10 +101,14 @@ def plot_grokking_comparison(results_dir: Path, output_path: Optional[Path] = No
                 data = json.load(f)
             conditions.append(condition_dir.name.replace("_", "\n"))
             grokking_steps.append(data.get("grokking_step") or 0)
-            test_accs.append(data.get("final_test_acc", 0))
-            fourier_concs.append(data.get("final_fourier_concentration", 0))
-        except Exception:
-            pass
+
+            test_acc = data.get("final_test_acc", 0)
+            test_accs.append(test_acc if test_acc is not None and not np.isnan(test_acc) else 0)
+
+            fourier = data.get("final_fourier_concentration", 0)
+            fourier_concs.append(fourier if fourier is not None and not np.isnan(fourier) else 0)
+        except Exception as ex:
+            print(f"Error reading {condition_dir}: {ex}")
     
     if not conditions:
         return

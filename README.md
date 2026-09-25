@@ -17,6 +17,26 @@ Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time 
 
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
+## Statistical Rigor Framework
+
+To address concerns regarding single-seed point estimates, we have introduced a comprehensive statistical rigor framework that spans cliff detection and ensemble aggregation.
+
+*   **Robust Cliff Detection:** The `src/rigorous_stats/cliff_detection.py` module introduces smooth moving-average thresholding and changepoint detection (via first derivative) to accurately determine grokking points, pre/post cliff levels, sharpness, and confidence against noisy curves.
+*   **Ensemble Aggregation:** The `src/ensemble/aggregation.py` script aggregates run data across multiple seeds, calculating means and Bootstrap Confidence Intervals (95% CI) for final accuracy, grokking step, and Fourier concentration.
+*   **Significance Testing:** The `src/rigorous_stats/stats_module.py` runs Mann-Whitney U tests between conditions to rigorously prove the difference between severity thresholds.
+
+### Running Rigorous Analysis
+
+You can execute the ensemble aggregation over the grid of multi-seed outputs to generate a `summary.md` and significance CSVs:
+
+```bash
+python src/ensemble/aggregation.py --results-dir results/multi_seed/
+```
+
+Interpreting the outputs:
+*   `summary.md`: Features the mean ± CI statistics for metrics.
+*   `significance_tests.csv`: Highlights if metrics (like Final Test Accuracy) are significantly different from the baseline `pure` regime (p < 0.05).
+
 ## Quick start
 
 ```bash

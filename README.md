@@ -82,3 +82,37 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+
+## Component-Level Circuit Transplants
+
+In addition to whole-block transplants, this repository supports surgically swapping individual components (like a specific attention head or MLP layer) between grokked (donor) and collapsed (recipient) models to pinpoint the exact locations of generalizing circuits.
+
+### Running a Transplant Sweep
+
+To perform a systematic sweep over all attention heads and MLPs:
+
+```bash
+uv run python -m src.transplant.sweep \
+    --pure-run results/path_to_grokked_run \
+    --contam-run results/path_to_collapsed_run \
+    --output-dir analysis/my_sweep
+```
+
+### Induction Probing
+
+To test if a transplanted component can induce grokking in the collapsed model, you can run brief induction training where only the transplanted component is unfrozen:
+
+```bash
+uv run python -m src.transplant.sweep \
+    --pure-run results/path_to_grokked_run \
+    --contam-run results/path_to_collapsed_run \
+    --induction-steps 200 \
+    --induction-lr 1e-3
+```
+
+This will log induction accuracy curves to `induction_curves.json` alongside the ranking table in `sweep_ranking.md`.
+
+### Interpreting the Results
+- **Zero-Shot Rescue (`test_acc`)**: If a single transplanted head causes test accuracy to jump from near-random to >90%, that head carries the core algorithmic circuit.
+- **Induction Rescue (`induction_test_acc`)**: If zero-shot fails but briefly training the *patched component* (with the rest of the model frozen) restores accuracy, it implies the component is a necessary seed, but the surrounding collapsed representations need minor alignment to utilize it.

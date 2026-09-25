@@ -248,11 +248,21 @@ def attention_pattern_entropy(
     for li, A in enumerate(attns):
         # Each row of A sums to 1 over keys
         # H_row = -sum p log p
+
+        # Ensure proper masking over valid keys to avoid padding token pollution
+        if mask is not None:
+            key_mask = mask.bool().unsqueeze(1).unsqueeze(2) # (B, 1, 1, T)
+            A = A * key_mask
+            A_sum = A.sum(dim=-1, keepdim=True).clamp_min(1e-12)
+            A = A / A_sum
+
         Af = A.float().clamp_min(1e-12)
         H = -(Af * Af.log()).sum(dim=-1)  # (B, n_heads, T)
+
         if mask is not None:
-            m = mask.bool().unsqueeze(1).expand_as(H)
-            vals = H[m].mean()
+            # Query mask
+            m = mask.bool().unsqueeze(1).expand_as(H) # (B, n_heads, T)
+            vals = H[m].mean() if m.any() else torch.tensor(0.0)
         else:
             vals = H.mean()
         layer_H.append(float(vals.item()))

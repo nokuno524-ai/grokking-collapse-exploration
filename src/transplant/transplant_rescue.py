@@ -76,9 +76,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
@@ -127,6 +127,7 @@ class VariantResult:
 
 
 def keys_for(component: str, sd: Dict[str, torch.Tensor]) -> List[str]:
+    """Returns all keys in the state dict that match the given component regex."""
     pat = COMPONENT_PATTERNS[component]
     return [k for k in sd.keys() if re.match(pat, k)]
 
@@ -157,12 +158,16 @@ def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
         cfg = {}
     res_path = run_dir / "results.json"
     if not cfg and res_path.exists():
-        with res_path.open() as f:
-            cfg = json.load(f).get("config", {})
+        try:
+            with res_path.open() as f:
+                cfg = json.load(f).get("config", {})
+        except json.JSONDecodeError:
+            print(f"[warn] Failed to parse {res_path} as JSON. Continuing with empty config.")
     return sd, cfg
 
 
 def build_model(cfg: dict, device: torch.device) -> ModularArithmeticTransformer:
+    """Instantiates a ModularArithmeticTransformer based on the provided config."""
     return ModularArithmeticTransformer(
         prime=int(cfg.get("prime", 59)),
         d_model=int(cfg.get("d_model", 128)),
@@ -242,7 +247,7 @@ def patch_state_dict(
                     f"shape mismatch on {k}: donor {tuple(donor_sd[k].shape)} "
                     f"vs base {tuple(base_sd[k].shape)}"
                 )
-            out[k] = donor_sd[k].clone()
+            out[k] = donor_sd[k].clone().to(dtype=base_sd[k].dtype, device=base_sd[k].device)
     return out
 
 
@@ -269,6 +274,7 @@ def make_loaders(
 
 
 def freeze_component(model: nn.Module, component: str) -> int:
+    """Freezes all parameters matching the component name regex, returning the count of frozen parameters."""
     """Freeze all params whose state_dict-style name matches `component`."""
     pat = COMPONENT_PATTERNS[component]
     n_frozen = 0
@@ -285,6 +291,7 @@ def evaluate_model(
     test_loader: DataLoader,
     device: torch.device,
 ) -> Dict[str, float]:
+    """Evaluates the model on train and test loaders, returning a dictionary of metrics."""
     train_loss, train_acc = evaluate(model, train_loader, device)
     test_loss, test_acc = evaluate(model, test_loader, device)
     fc = compute_fourier_concentration(model)
@@ -344,6 +351,7 @@ def run_one_variant(
     rescue_seed: int = 0,
     rng: Optional[torch.Generator] = None,
 ) -> VariantResult:
+    """Runs a single transplant evaluation variant and returns the results."""
     if component is None:
         # baseline / swap_all path: state dict is taken as-is from `donor_sd`
         sd = {k: v.clone() for k, v in (donor_sd or base_sd).items()}

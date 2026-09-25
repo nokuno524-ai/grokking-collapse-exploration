@@ -76,40 +76,22 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 try:
-    from .model import ModularArithmeticTransformer
-    from .data import DatasetConfig, generate_modular_arithmetic
-    from .train import compute_fourier_concentration, evaluate
+    from src.model import ModularArithmeticTransformer
+    from src.data import DatasetConfig, generate_modular_arithmetic
+    from src.train import compute_fourier_concentration, evaluate
 except ImportError:
     from model import ModularArithmeticTransformer  # type: ignore
     from data import DatasetConfig, generate_modular_arithmetic  # type: ignore
     from train import compute_fourier_concentration, evaluate  # type: ignore
 
 
-# Mapping from a short component name to the regex of state_dict keys it covers.
-COMPONENT_PATTERNS: Dict[str, str] = {
-    "token_embed": r"^token_embed\.",
-    "pos_embed": r"^pos_embed\.",
-    "self_attn_in_proj": r"^transformer\.layers\.\d+\.self_attn\.in_proj_(weight|bias)$",
-    "self_attn_out_proj": r"^transformer\.layers\.\d+\.self_attn\.out_proj\.",
-    "linear1": r"^transformer\.layers\.\d+\.linear1\.",
-    "linear2": r"^transformer\.layers\.\d+\.linear2\.",
-    "norm1": r"^transformer\.layers\.\d+\.norm1\.",
-    "norm2": r"^transformer\.layers\.\d+\.norm2\.",
-    "ln": r"^ln\.",
-    "output_head": r"^output_head\.",
-}
-
-# The 6 components we report in the main table — picked because each is a single
-# semantically meaningful block. token_embed and output_head touch the Fourier
-# basis directly; attn / FFN are the obvious circuit-carrying matrices.
-DEFAULT_PATCH_COMPONENTS = [
-    "token_embed",
-    "self_attn_in_proj",
-    "self_attn_out_proj",
-    "linear1",
-    "linear2",
-    "output_head",
-]
+from src.transplant.patching import (
+    COMPONENT_PATTERNS,
+    DEFAULT_PATCH_COMPONENTS,
+    keys_for,
+    patch_state_dict,
+    random_basis_swap
+)
 
 
 @dataclass
@@ -124,11 +106,6 @@ class VariantResult:
     weight_norm: float
     rescue_steps: int = 0
     notes: str = ""
-
-
-def keys_for(component: str, sd: Dict[str, torch.Tensor]) -> List[str]:
-    pat = COMPONENT_PATTERNS[component]
-    return [k for k in sd.keys() if re.match(pat, k)]
 
 
 def load_run(run_dir: Path, step: Optional[int] = None) -> Tuple[Dict, dict]:
@@ -190,60 +167,6 @@ def get_fourier_basis(token_embed: torch.Tensor, top_k: int = 5) -> dict:
         "top_fraction": float(topv.sum().item() / total.item()),
         "spectrum_top10": [float(x.item()) for x in avg[:10]],
     }
-
-
-def random_basis_swap(weight: torch.Tensor, rng: torch.Generator) -> torch.Tensor:
-    """Return a tensor with the same shape and spectrum as `weight` but a
-    random orthonormal basis. Specificity control: keeps ||W||_F and the
-    singular values, randomizes which directions are which.
-
-    For 1-D bias vectors, returns a copy with a random *permutation* of the
-    same values (preserves L2 norm and entry distribution)."""
-    w = weight.detach().to(torch.float32).clone()
-    if w.ndim == 1:
-        idx = torch.randperm(w.numel(), generator=rng)
-        return w[idx]
-    if w.ndim != 2:
-        # higher-dim parameters: flatten the last dims and apply 2-D variant
-        orig_shape = w.shape
-        w2 = w.reshape(w.shape[0], -1)
-        out = random_basis_swap(w2, rng)
-        return out.reshape(orig_shape)
-    U, S, Vh = torch.linalg.svd(w, full_matrices=False)
-    # Random orthonormal U' and Vh' of correct shapes.
-    Ur, _ = torch.linalg.qr(torch.randn(U.shape, generator=rng))
-    Vr, _ = torch.linalg.qr(torch.randn(Vh.T.shape, generator=rng))
-    Vhr = Vr.T
-    return Ur @ torch.diag(S) @ Vhr
-
-
-def patch_state_dict(
-    base_sd: Dict[str, torch.Tensor],
-    donor_sd: Dict[str, torch.Tensor],
-    component: str,
-    randomize: bool = False,
-    rng: Optional[torch.Generator] = None,
-) -> Dict[str, torch.Tensor]:
-    """Return a new state_dict = base, with `component` replaced by donor's.
-    If randomize=True, replace with a random-orthonormal-basis version of base
-    (specificity control); donor is unused in that path."""
-    out = {k: v.clone() for k, v in base_sd.items()}
-    if randomize:
-        if rng is None:
-            rng = torch.Generator().manual_seed(0)
-        for k in keys_for(component, base_sd):
-            out[k] = random_basis_swap(base_sd[k], rng)
-    else:
-        for k in keys_for(component, base_sd):
-            if k not in donor_sd:
-                continue
-            if donor_sd[k].shape != base_sd[k].shape:
-                raise ValueError(
-                    f"shape mismatch on {k}: donor {tuple(donor_sd[k].shape)} "
-                    f"vs base {tuple(base_sd[k].shape)}"
-                )
-            out[k] = donor_sd[k].clone()
-    return out
 
 
 def make_loaders(

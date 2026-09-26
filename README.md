@@ -82,3 +82,17 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Representational Geometry
+
+To understand *where* in the model collapse does its damage, we track the representational geometry of the hidden states throughout training:
+- **CKA (Centered Kernel Alignment)**: Measures the similarity of a layer's representations at a given step to the final, grokked reference model (the `pure` condition).
+- **Effective Rank**: Evaluates the dimensionality/spread of the representations.
+- **Probe Accuracy**: Assesses how linearly separable the target classes or token identities are at a given layer.
+
+The analysis emits a `collapse_onset_map.csv` (condition × layer × step) which localizes the exact training step and layer where representations in collapse conditions begin to diverge (drop in CKA below a 0.8 threshold) from the healthy `pure` trajectory.
+
+```bash
+# Run the representational geometry analysis
+python src/analysis/representational_geometry.py --results-dir results --output-dir analysis/geometry
+```

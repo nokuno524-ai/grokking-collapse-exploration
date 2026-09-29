@@ -32,6 +32,9 @@ class ModularArithmeticTransformer(nn.Module):
         dropout: float = 0.0,
     ):
         super().__init__()
+        if d_model % n_heads != 0:
+            raise ValueError(f"d_model ({d_model}) must be divisible by n_heads ({n_heads})")
+
         self.prime = prime
         self.d_model = d_model
         self.n_heads = n_heads

@@ -40,6 +40,22 @@ python src/transplant_rescue.py \
     --output-dir analysis/transplant
 ```
 
+## Gallery
+
+The repository now includes a reusable visualization suite for training-time attention dynamics (`src/attention/visualizer.py` and `src/attention/dynamics.py`).
+
+To generate these plots for a specific run, use the dynamics driver:
+```bash
+python src/attention/dynamics.py --run-dir results/pure --output-dir analysis/dynamics/pure
+```
+
+### Available Visualizations
+
+- **Attention Grids** (`plot_attention_grid`): Heatmaps of the attention weights per layer and per head across the sequence.
+- **Attention Entropy** (`plot_attention_entropy`): Tracks the Shannon entropy of attention patterns over training steps. A sharp drop indicates concentration/specialization.
+- **Head Specialization** (`plot_head_specialization_clusters`): A dendrogram visualizing hierarchical clustering of attention heads based on their pattern similarity.
+- **Attention Evolution** (`animate_attention_evolution`): A GIF/MP4 animation showing how an attention pattern transitions step-by-step during grokking.
+
 ## Architecture
 
 - 1-layer Transformer encoder, d_model=128, 4 heads, d_ff=512 (~214K params).

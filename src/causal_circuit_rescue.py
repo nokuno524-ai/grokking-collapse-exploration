@@ -42,6 +42,7 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from .checkpoint import load_run_config, list_checkpoints
 
 import matplotlib
 
@@ -128,13 +129,7 @@ def matrix_spectra(
     return points
 
 
-def load_run_config(run_dir: Path) -> Optional[dict]:
-    res = run_dir / "results.json"
-    if not res.exists():
-        return None
-    with res.open() as f:
-        data = json.load(f)
-    return data
+
 
 
 def analyze_run(run_dir: Path) -> Dict:

@@ -285,6 +285,7 @@ def run_all_conditions(output_dir: str = "results", max_steps: int = 50000):
             condition_name=name,
             output_dir=output_dir,
             max_steps=max_steps,
+            seed=data_config.seed,
         )
         
         state = train(train_config)

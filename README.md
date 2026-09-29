@@ -34,11 +34,32 @@ sbatch slurm/exp_c_grid.sbatch
 sbatch slurm/baselines.sh
 
 # Surgical transplant rescue (after Experiment A is run)
-python src/transplant_rescue.py \
+python src/transplant/transplant_rescue.py \
     --pure-run results/exp_c_grid/wd1/noise0/seed_42 \
     --contam-run results/exp_c_grid/wd1/noise0.15/seed_42 \
     --output-dir analysis/transplant
+
+# Systematic circuit transplant matrix
+# Extracts components from each condition and transplants into models of all other conditions.
+python src/transplant/sweep.py \
+    --base-dir results/exp_c_grid/wd1 \
+    --output analysis/transplant_matrix.json
+
+# Analyze the transplant matrix (generates heatmaps and portability summary)
+python src/analysis/atlas_analysis.py \
+    --input analysis/transplant_matrix.json \
+    --output-dir analysis/transplant_atlas
 ```
+
+## Interpreting Portability Heatmaps
+
+The matrix analysis produces heatmaps and a `PORTABILITY_SUMMARY.md`. In a heatmap:
+- **Rows (Y-axis)**: The Donor (Source) condition from which the circuit component is extracted.
+- **Columns (X-axis)**: The Recipient (Target) condition into which the component is transplanted.
+- **Values**: Zero-shot test accuracy of the recipient model after receiving the patch.
+
+**Condition-Portable circuits** will show a bright vertical band in the "pure" row, indicating they boost or maintain accuracy when placed in any other condition.
+**Condition-Locked circuits** only help the diagonal (themselves), indicating the strategy relies on condition-specific network context.
 
 ## Architecture
 

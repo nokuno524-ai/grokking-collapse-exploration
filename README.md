@@ -82,3 +82,23 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Statistical Methodology
+
+All headline findings in this repository are rigorously evaluated across multiple initializations using non-parametric statistics to ensure robustness.
+
+**1. Bootstrap Confidence Intervals**
+Because grokking step distributions can be highly skewed, we compute 95% Confidence Intervals (CIs) on the mean grokking cliff using bootstrap resampling (`num_bootstraps=1000`).
+
+**2. Permutation Testing**
+To determine if two experimental conditions (e.g., pure vs. contaminated) lead to statistically distinct grokking cliffs, we use non-parametric permutation testing on the mean difference.
+
+**3. Multiple Comparison Correction**
+When testing the pure baseline against multiple collapse severity conditions, we adjust all raw p-values using the Holm-Bonferroni correction to strictly control the family-wise error rate.
+
+**Generating the Rigorous Statistics Table:**
+The multi-seed sweep driver natively supports aggregation across seeds to generate a robust Markdown summary file.
+```bash
+python src/run_multi_seed.py --aggregate
+```
+This generates `analysis/rigorous_summary.md` detailing mean cliff locations, standard deviations, bootstrap CIs, and corrected permutation tests.

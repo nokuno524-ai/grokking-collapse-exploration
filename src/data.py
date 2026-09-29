@@ -12,25 +12,48 @@ from typing import Optional, Tuple
 
 @dataclass
 class DatasetConfig:
-    """Configuration for dataset generation."""
-    prime: int = 59  # Modular arithmetic modulus
-    train_fraction: float = 0.3  # Fraction of data for training
-    collapse_level: float = 0.0  # Fraction of training data replaced by synthetic
-    collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
-    noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
+    """
+    Configuration for dataset generation in modular arithmetic grokking experiments.
+
+    Attributes:
+        prime (int): The prime modulus for the arithmetic task (default: 59). Must be > 1.
+        train_fraction (float): The fraction of the total possible data pairs to use for training (default: 0.3).
+        collapse_level (float): The fraction of the training data whose labels are replaced by synthetic (collapsed) generator outputs (default: 0.0).
+        collapse_severity (float): How severely the synthetic generator's output distribution has "collapsed" (0=fresh, 1=fully collapsed) (default: 0.5).
+        noise_fraction (float): The fraction of training labels randomly replaced with uniform random labels, independent of collapse (default: 0.0).
+        seed (int): The random seed for reproducibility (default: 42).
+        operation (str): The modular arithmetic operation to perform, e.g. 'add' (default: 'add').
+    """
+    prime: int = 59
+    train_fraction: float = 0.3
+    collapse_level: float = 0.0
+    collapse_severity: float = 0.5
+    noise_fraction: float = 0.0
     seed: int = 42
+    operation: str = 'add'
 
 
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Generate (a, b) -> (a + b) mod p dataset.
     
+    Args:
+        config (DatasetConfig): Configuration for the dataset.
+
     Returns:
-        train_inputs, train_targets, test_inputs, test_targets
-        Inputs are (a, b) pairs encoded as token indices.
-        Targets are (a + b) mod p.
+        tuple: (train_inputs, train_targets, test_inputs, test_targets)
+            - train_inputs (torch.Tensor): Training inputs, shape (N_train, 2).
+            - train_targets (torch.Tensor): Training targets, shape (N_train,).
+            - test_inputs (torch.Tensor): Test inputs, shape (N_test, 2).
+            - test_targets (torch.Tensor): Test targets, shape (N_test,).
+
+    Raises:
+        ValueError: If config.prime <= 1.
     """
     p = config.prime
+    if p <= 1:
+        raise ValueError(f"Prime modulus must be > 1, got {p}")
+
     rng = np.random.RandomState(config.seed)
     
     # Generate all possible (a, b) pairs

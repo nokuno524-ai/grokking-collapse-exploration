@@ -31,6 +31,23 @@ class ModularArithmeticTransformer(nn.Module):
         n_layers: int = 1,
         dropout: float = 0.0,
     ):
+        """
+        Initialize the ModularArithmeticTransformer.
+
+        Args:
+            prime: The modulo prime number.
+            d_model: The hidden dimensionality of the model.
+            n_heads: Number of attention heads.
+            d_ff: The feed-forward network dimensionality.
+            n_layers: Number of transformer layers.
+            dropout: Dropout probability.
+
+        Raises:
+            ValueError: If d_model is not perfectly divisible by n_heads.
+        """
+        if d_model % n_heads != 0:
+            raise ValueError(f"d_model ({d_model}) must be perfectly divisible by n_heads ({n_heads}).")
+
         super().__init__()
         self.prime = prime
         self.d_model = d_model

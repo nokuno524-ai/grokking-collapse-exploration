@@ -56,6 +56,8 @@ def main():
     parser.add_argument("--output-dir", type=str, default="results/multi_seed")
     parser.add_argument("--array-id", type=int, default=None,
                         help="If set, run only the task with this index (for Slurm arrays)")
+    parser.add_argument("--aggregate", action="store_true",
+                        help="If set, aggregate results and compute rigorous statistics after all runs finish")
     args = parser.parse_args()
 
     seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
@@ -73,6 +75,14 @@ def main():
     for i, (seed, cond_name, cond_cfg) in enumerate(tasks):
         print(f"\n{'='*60}\n[{i+1}/{len(tasks)}] seed={seed} condition={cond_name}\n{'='*60}")
         run_one(seed, cond_name, cond_cfg, args.output_dir, args.max_steps)
+
+    if args.aggregate:
+        print("\nAggregating results across all seeds...")
+        try:
+            from src.rigorous_stats.cliff_stability import aggregate_and_report_results
+            aggregate_and_report_results(args.output_dir)
+        except ImportError as e:
+            print(f"Failed to import rigorous stats module for aggregation: {e}")
 
 
 if __name__ == "__main__":

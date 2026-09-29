@@ -239,12 +239,15 @@ def train(config: TrainConfig) -> TrainState:
         # Save checkpoint
         if step % config.save_every == 0:
             ckpt_path = output_dir / f"checkpoint_{step}.pt"
-            torch.save({
-                "step": step,
-                "model_state": model.state_dict(),
-                "optimizer_state": optimizer.state_dict(),
-                "config": asdict(config),
-            }, ckpt_path)
+            try:
+                torch.save({
+                    "step": step,
+                    "model_state": model.state_dict(),
+                    "optimizer_state": optimizer.state_dict(),
+                    "config": asdict(config),
+                }, ckpt_path)
+            except Exception as e:
+                print(f"Warning: Failed to save checkpoint to {ckpt_path}: {e}")
     
     # Save final results
     results = {
@@ -260,10 +263,12 @@ def train(config: TrainConfig) -> TrainState:
     }
     
     results_path = output_dir / "results.json"
-    with open(results_path, "w") as f:
-        json.dump(results, f, indent=2)
-    
-    print(f"\nResults saved to {results_path}")
+    try:
+        with open(results_path, "w") as f:
+            json.dump(results, f, indent=2)
+        print(f"\nResults saved to {results_path}")
+    except Exception as e:
+        print(f"\nWarning: Failed to save results to {results_path}: {e}")
     print(f"Grokked: {state.grokked} at step {state.grokking_step}")
     
     return state

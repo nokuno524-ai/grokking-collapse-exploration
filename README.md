@@ -82,3 +82,18 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Circuit Analysis & Transplant
+
+The project includes tooling for systematic mechanistic analysis and component transplants (Experiment A):
+- **Ablation Grid**: Use `python src/transplant/sweep.py --pure-run <pure_dir> --contam-run <contam_dir>` to perform systematic component swaps between pure and collapsed models, as well as zero, mean, and resample ablations. Outputs are saved in `analysis/ablation_grid_results.json`.
+- **Layerwise Contribution**: Run `python src/analysis/layerwise_contribution.py --runs <run1> <run2>...` to analyze how much each layer's weights change across the grokking transition (comparing pre-grok to post-grok checkpoints). It outputs relative L2 change metrics in a CSV and generates a visual heatmap (`layerwise_heatmap.png`).
+
+### Interpreting Mechanistic Outputs
+- **Ablation Grid Results (`analysis/ablation_grid_results.json`)**:
+  - `transplant_pure_to_contam_<C>`: If test accuracy jumps from near-random to >99%, component `<C>` contains the missing generalization circuit.
+  - `transplant_contam_to_pure_<C>`: If test accuracy drops to near-random, component `<C>` in the pure model was load-bearing.
+  - `zero_pure_<C>` or `mean_pure_<C>`: Isolates whether the circuit's mere presence (scale) or its precise feature direction is what matters.
+  - The `loss_gap` metric indicates whether a component transplant restores confidence (small gap) or only boundary decisions (large gap).
+- **Layerwise Contribution (`layerwise_heatmap.png`)**:
+  - Highlights which weight matrices (e.g., token embeddings vs. output head vs. attention out-proj) undergo the largest L2 change during the exact window when test accuracy crosses the grokking threshold (step 1400 in pure runs). In severe collapse, it confirms if these layers are frozen or diverging in random directions.

@@ -82,3 +82,27 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Statistical Protocol
+
+The statistical methods for analyzing grokking cliffs are implemented in `src/rigorous_stats/`:
+
+- **Changepoint Detection:** Grokking transitions are detected using a variance-minimizing binary segmentation approach (`src/rigorous_stats/cliff_detection.py`), rather than arbitrary thresholds. This computes the optimal step at which the test accuracy curve splits into two distinct segments, provided the jump is at least 20%.
+- **Uncertainty Quantification:** The changepoint detection also estimates a contiguous confidence region based on where the piecewise-constant cost function is within a margin (default 1.05x) of the global minimum.
+- **Aggregation:** Multiple seeds are aggregated in `src/rigorous_stats/cliff_stability.py` via median, with 95% bootstrap confidence intervals for the median cliff step.
+- **Power Analysis:** `src/rigorous_stats/stats_module.py` contains tools for calculating the required number of seeds to resolve a target effect size in cliff location between conditions.
+
+### Worked Example: Power Analysis
+
+If a pilot sweep showed a typical standard deviation in cliff step location of 10k steps (so variance = 100M) and we wish to confidently detect a condition-driven shift of at least 10k steps (target diff = 10k):
+
+```python
+from src.rigorous_stats.stats_module import power_analysis
+variance = 100_000_000
+target_diff = 10_000
+
+# Using closed-form approximation
+n_seeds = power_analysis(variance, target_diff, alpha=0.05, power=0.8)
+print(f"Requires ~{int(n_seeds)} seeds per condition")
+# Requires ~15 seeds per condition
+```

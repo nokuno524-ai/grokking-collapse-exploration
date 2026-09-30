@@ -15,6 +15,22 @@ After 230 toy runs (1-layer transformer, 214K params, p=59) and 4 GPT-2-medium r
 
 Toy phase: complete. Real-LM phase: in-flight (data-prep job died at SLURM time limit; resubmission queued). Mechanistic causal analysis: observational only — surgical-transplant rescue (Experiment A) is the next milestone. Threshold theory (Experiment C) has the empirical wd × noise grid; closed-form derivation pending.
 
+## Methods & Predictive Indicators
+
+As part of testing the hypothesis that *collapse blocks grokking*, we implemented dose-response analysis and early-warning indicators that forecast a model's eventual grokking success based solely on its early training trajectory (e.g. at 25% of the expected grokking step).
+
+1. **Dose-Response Harness (`src/prediction/dose_response_harness.py`)**: Sweeps across fine-grained levels of synthetic-data fraction (`collapse_level`) and mixture temperature (`collapse_severity`) to generate continuous dose-response curves, expanding on the discrete grid.
+2. **Early-Warning Indicators (`src/prediction/early_warning.py`)**: Without waiting for full training or the test-accuracy cliff, we extract leading signals:
+   - *Effective Rank*: Tracked over checkpoints, identifying representational collapse well before the cliff.
+   - *Weight Norm Trajectory*: Evaluates the decay/growth slope of `||W||`.
+   - *Train-Test Gap Derivative*: Forecasts generalization failure if the gap accelerates rapidly early on.
+   - *Attention Entropy*: Extracted dynamically to measure representation narrowing in attention heads.
+3. **Outcome Predictor (`src/prediction/outcome_predictor.py`)**: A logistic regression classifier that takes these early signals and predicts final grokking success via Leave-One-Out Cross-Validation (LOOCV). It reliably predicts grokking failures on collapsed datasets long before they actually stall.
+
+### Figure Interpretations
+- **Dose-Response Heatmaps**: These plots map `collapse_level` vs `collapse_severity`, illuminating the sharp, precise cliff beyond which grokking becomes structurally blocked.
+- **Early-Warning Trajectories**: Time series plots contrasting collapsed vs. pure runs at step ranges far earlier than grokking, visualizing diverging attention entropy, weight norms, and rank collapse before test accuracy gives any signal.
+
 See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_STAGE.md` for the week-by-week plan.
 
 ## Quick start

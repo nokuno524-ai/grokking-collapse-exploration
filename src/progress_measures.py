@@ -57,6 +57,8 @@ def detect_phase_transition(history: List[Dict], metric: str = "test_acc",
 def compute_learning_speed(history: List[Dict], metric: str = "test_acc",
                            window: int = 10) -> List[Dict]:
     """Compute rate of change of a metric over a sliding window."""
+    if not history:
+        return []
     speeds = []
     for i in range(len(history)):
         if i < window:

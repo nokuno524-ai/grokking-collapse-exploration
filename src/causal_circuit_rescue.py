@@ -192,19 +192,25 @@ def find_sharpest_transition(steps, ranks):
                          "rel_jump": float("nan")}
             continue
         diffs = np.diff(arr)
-        if np.all(np.isnan(diffs)):
+        if len(diffs) == 0 or np.all(np.isnan(diffs)):
             out[name] = {"max_jump": float("nan"),
                          "step_after": None,
                          "rel_jump": float("nan")}
             continue
-        idx = int(np.nanargmax(np.abs(diffs)))
-        max_jump = float(diffs[idx])
-        baseline = max(abs(arr[idx]), 1e-6)
-        out[name] = {
-            "max_jump": max_jump,
-            "step_after": int(steps[idx + 1]),
-            "rel_jump": max_jump / baseline,
-        }
+        try:
+            idx = int(np.nanargmax(np.abs(diffs)))
+            max_jump = float(diffs[idx])
+            baseline = max(abs(arr[idx]), 1e-6)
+            out[name] = {
+                "max_jump": max_jump,
+                "step_after": int(steps[idx + 1]),
+                "rel_jump": max_jump / baseline,
+            }
+        except ValueError:
+            # Handles edge case where np.nanargmax fails
+            out[name] = {"max_jump": float("nan"),
+                         "step_after": None,
+                         "rel_jump": float("nan")}
     return out
 
 

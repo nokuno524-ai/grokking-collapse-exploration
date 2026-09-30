@@ -72,6 +72,8 @@ def slope_per_1000(history: List[Dict], key: str, log: bool = False) -> Optional
         return None
     steps = np.array([e["step"] for e in history], dtype=float)
     vals = np.array([e.get(key, 0.0) for e in history], dtype=float)
+    if len(steps) < 2 or np.all(steps == steps[0]):
+        return None
     if log:
         vals = np.log(np.clip(vals, 1e-6, None))
     A = np.column_stack([np.ones_like(steps), steps])

@@ -82,3 +82,29 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Scaling Law Methodology
+
+To test if the collapse-grokking boundary shifts with scaling parameters (such as model width or dataset size), we fit candidates functional forms—namely, a log-linear model ($\log \eta^* = a + b \cdot x$) and a power law ($\eta^* = C \cdot x^b$).
+
+### Analysis Protocol:
+1. Run a grid of models covering multiple sizes (`d_model`) across various synthetic data contamination rates (`collapse_level`).
+2. Determine the critical fraction $\eta^*$ at which grokking fails, per dimension and seed.
+3. Fit equations via Ordinary Least Squares on non-degenerate data points.
+4. Measure significance of findings using bootstrap resampling to produce 95% Confidence Intervals for fitted coefficients using identical seeds/conditions matching the experiment grid.
+
+### Reproduction Command
+```bash
+python src/analysis/scaling_boundary.py --results-dir results/grid --out-dir analysis/scaling
+```
+This generates a markdown summary (`scaling_summary.md`), a phase diagram (`phase_diagram.png`), and raw data (`phase_diagram.csv`).
+
+### Automatic Report Generation
+You can regenerate the phase diagram and scaling fits at any time (e.g., when new sweep results land) by running:
+```bash
+./update_diagrams.sh
+```
+This is idempotent and defaults to scanning `results/grid/` and outputting to `analysis/scaling/`. You can pass custom paths:
+```bash
+./update_diagrams.sh <results_dir> <output_dir>
+```

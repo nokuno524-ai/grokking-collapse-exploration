@@ -82,3 +82,28 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Optimizer and Regularization Sweep
+
+The codebase includes an extended sweep harness (`src/optimizer_sweep/run_opt_sweep.py`) to systematically map the collapse-grokking boundary across different optimization and regularization strategies.
+
+### What the data will show
+
+Based on theory and preliminary runs, we expect the optimizer and weight-decay grid to demonstrate:
+
+1. **AdamW vs SGD momentum.** The sharp grokking cliffs are heavily influenced by the implicit regularization of the optimizer. We expect SGD with momentum to require different explicit regularization (weight decay) schedules to reach the low weight-norm regimes necessary for grokking.
+2. **Weight decay shifts the boundary.** As weight decay increases, the model's weight-norm decreases faster. This shifts the boundary of grokking success towards higher label-noise and collapse levels, at the expense of potential underfitting at the highest weight decay settings.
+3. **Learning rate interaction.** Higher learning rates (up to the stability limit) interact with weight decay to accelerate the grokking phase, potentially rescuing runs that would otherwise "collapse" into the generalization gap.
+
+### Running the Optimizer Sweep
+
+```bash
+# Run the full sweep (Optimizer × WD × LR × Condition)
+python src/optimizer_sweep/run_opt_sweep.py --max-steps 50000
+
+# Dry-run to see generated tasks
+python src/optimizer_sweep/run_opt_sweep.py --dry-run
+
+# Generate the boundary map and statistics
+python src/optimizer_sweep/opt_boundary_map.py
+```

@@ -38,6 +38,7 @@ class TrainConfig:
     lr: float = 1e-3
     weight_decay: float = 1.0  # Key hyperparameter for grokking!
     batch_size: int = 512
+    optimizer: str = "adamw"
     
     # Logging
     eval_every: int = 100
@@ -107,7 +108,7 @@ def evaluate(model: nn.Module, dataloader: DataLoader, device: torch.device) -> 
             correct += (preds == targets).sum().item()
             total += inputs.shape[0]
     
-    return total_loss / total, correct / total
+    return total_loss / total if total > 0 else float('nan'), correct / total if total > 0 else 0.0
 
 
 def train(config: TrainConfig) -> TrainState:
@@ -154,9 +155,16 @@ def train(config: TrainConfig) -> TrainState:
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     # Optimizer with weight decay (critical for grokking)
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=config.lr, weight_decay=config.weight_decay
-    )
+    if config.optimizer.lower() == "adamw":
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=config.lr, weight_decay=config.weight_decay
+        )
+    elif config.optimizer.lower() == "sgd":
+        optimizer = torch.optim.SGD(
+            model.parameters(), lr=config.lr, weight_decay=config.weight_decay, momentum=0.9
+        )
+    else:
+        raise ValueError(f"Unknown optimizer: {config.optimizer}")
     
     # Training state
     state = TrainState()
@@ -193,6 +201,10 @@ def train(config: TrainConfig) -> TrainState:
         state.step = step
         state.train_loss = loss.item()
         
+        if torch.isnan(loss):
+            print(f"NaN loss detected at step {step}. Stopping training.")
+            break
+
         # Evaluate periodically
         if step % config.eval_every == 0:
             train_loss, train_acc = evaluate(model, train_loader, device)

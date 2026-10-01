@@ -82,3 +82,14 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Mechanistic Interventions & Cross-Run Transplants (New)
+
+We have extended the circuit-analysis utilities to support **systematic cross-run transplants** and **ablation atlases**.
+* **`src/transplant/patching.py`**: Supports whole-module and per-attention-head surgical component swapping.
+* **`src/transplant/atlas.py`**: Targeted causal ablations (zero, mean, and resample-ablation).
+* **`src/transplant/sweep.py`**: Orchestrates massive donor-to-recipient component swaps to isolate generalized representations across seeds, with effect sizes and `induction_train` fine-tuning.
+* **`src/attention/extraction.py`**: Context managers to reliably hook and compute entropy over attention probabilities despite SDPA optimization paths.
+* **`src/rigorous_stats/stats_module.py`**: Formal bootstrap CIs and permutation tests for mechanistic outcomes.
+
+See `analysis/MECHANISTIC_SUMMARY.md` for methodology.

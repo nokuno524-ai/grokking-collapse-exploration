@@ -246,11 +246,23 @@ def attention_pattern_entropy(
     mask = batch.get("attention_mask")
     layer_H = []
     for li, A in enumerate(attns):
-        # Each row of A sums to 1 over keys
-        # H_row = -sum p log p
         Af = A.float().clamp_min(1e-12)
-        H = -(Af * Af.log()).sum(dim=-1)  # (B, n_heads, T)
+
+        # When calculating attention entropy over padded sequences,
+        # key dimensions must be explicitly masked out to prevent padding tokens
+        # from artificially distorting the entropy.
         if mask is not None:
+            k_mask = mask.bool().unsqueeze(1).unsqueeze(2)  # (B, 1, 1, T)
+            Af = Af * k_mask
+            row_sums = Af.sum(dim=-1, keepdim=True).clamp_min(1e-12)
+            Af = Af / row_sums
+
+        # H_row = -sum p log p
+        Af_clamped = Af.clamp_min(1e-12)
+        H = -(Af_clamped * Af_clamped.log()).sum(dim=-1)  # (B, n_heads, T)
+
+        if mask is not None:
+            # Mask out queries that are padding
             m = mask.bool().unsqueeze(1).expand_as(H)
             vals = H[m].mean()
         else:

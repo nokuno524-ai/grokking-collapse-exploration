@@ -82,3 +82,25 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+## Attention-head taxonomy
+
+The `src/attention` module contains tools for unsupervised taxonomy classification and causal validation of attention heads across the grokking transition:
+
+- **Extraction**: The `extract_attention` context manager seamlessly hooks `nn.MultiheadAttention.forward` to capture attention weights.
+- **Taxonomy clustering**: We compute metrics like attention entropy, positional bias, diagonal mass, and copy/induction scores directly from token streams to cluster heads into behavioral classes (e.g., positional, induction, copy, other) using unsupervised rules. Outputting a JSON atlas mapping per-checkpoint.
+- **Causal validation**: Targeted ablation (zeroing or mean-ablating QKV and out_proj weight slices) allows causal quantification of each head class's effect on accuracy before and after grokking transitions.
+
+**Example usage (Python):**
+```python
+from src.attention.taxonomy import build_atlas
+from src.attention.causal import evaluate_ablation
+from pathlib import Path
+
+# Extract taxonomy across checkpoints
+atlas = build_atlas([Path("results/pure/checkpoint_50000.pt")], data_config)
+
+# Causal testing via targeted ablation
+acc_drops = evaluate_ablation(model, test_dataloader, head_classes=atlas["50000"])
+print(acc_drops)
+```

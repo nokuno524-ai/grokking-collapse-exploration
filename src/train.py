@@ -17,10 +17,14 @@ try:
     # Import as a package: `from src.train import train`
     from .model import ModularArithmeticTransformer
     from .data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from .schedule import ScheduleConfig, build_schedule
+    from .analysis.attention_metrics import compute_head_class_usage
 except ImportError:
     # Run as a script: `python src/train.py`
     from model import ModularArithmeticTransformer
     from data import generate_modular_arithmetic, DatasetConfig, get_all_conditions
+    from schedule import ScheduleConfig, build_schedule
+    from analysis.attention_metrics import compute_head_class_usage
 
 
 @dataclass
@@ -50,6 +54,13 @@ class TrainConfig:
     train_fraction: float = 0.3
     noise_fraction: float = 0.0
     seed: int = 42
+
+    # Schedule
+    schedule_type: str = "fixed"
+    switch_step: int = 25000
+    switch_to: float = 0.15
+    block_size: int = 5000
+    ramp_steps: int = 10000
     
     # Output
     output_dir: str = "results"
@@ -120,28 +131,59 @@ def train(config: TrainConfig) -> TrainState:
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
 
-    # Generate data
-    data_config = DatasetConfig(
-        prime=config.prime,
-        train_fraction=config.train_fraction,
+    # Build schedule
+    sched_config = ScheduleConfig(
+        schedule_type=config.schedule_type,
         collapse_level=config.collapse_level,
         collapse_severity=config.collapse_severity,
-        noise_fraction=config.noise_fraction,
-        seed=config.seed,
+        switch_step=config.switch_step,
+        switch_to=config.switch_to,
+        block_size=config.block_size,
+        ramp_steps=config.ramp_steps
     )
-    train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
+    phases = build_schedule(sched_config, config.max_steps)
+    current_phase_idx = -1
     
-    train_dataset = TensorDataset(train_in, train_tgt)
-    test_dataset = TensorDataset(test_in, test_tgt)
+    test_dataset = None
+    test_loader = None
+    train_loader = None
+    dataloader_iter = None
+    
+    def setup_phase_data(phase_idx: int):
+        phase = phases[phase_idx]
+        print(f"Entering Phase {phase_idx}: steps {phase.start_step}-{phase.end_step}, level={phase.collapse_level:.3f}")
+        # Base seed for consistent train/test split. Phase seed incorporates phase idx for different corruptions.
+        data_config = DatasetConfig(
+            prime=config.prime,
+            train_fraction=config.train_fraction,
+            collapse_level=phase.collapse_level,
+            collapse_severity=phase.collapse_severity,
+            noise_fraction=config.noise_fraction,
+            seed=config.seed,
+            base_seed=config.seed,
+            phase_seed=config.seed + phase_idx * 1000
+        )
+        train_in, train_tgt, test_in, test_tgt = generate_modular_arithmetic(data_config)
 
-    loader_generator = torch.Generator()
-    loader_generator.manual_seed(config.seed)
-    train_loader = DataLoader(
-        train_dataset, batch_size=config.batch_size, shuffle=True,
-        generator=loader_generator,
-    )
-    test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
-    
+        train_ds = TensorDataset(train_in, train_tgt)
+
+        loader_gen = torch.Generator()
+        loader_gen.manual_seed(config.seed + phase_idx * 100)
+        tr_loader = DataLoader(
+            train_ds, batch_size=config.batch_size, shuffle=True,
+            generator=loader_gen,
+        )
+
+        nonlocal test_dataset, test_loader
+        # Test dataset uses pure data usually (or at least consistent split), we only set it up once
+        if test_dataset is None:
+            test_dataset = TensorDataset(test_in, test_tgt)
+            test_loader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False)
+
+        return tr_loader
+
+    # Initial dataloader setup will happen in the loop.
+
     # Create model
     model = ModularArithmeticTransformer(
         prime=config.prime,
@@ -166,10 +208,15 @@ def train(config: TrainConfig) -> TrainState:
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Training loop
-    dataloader_iter = iter(train_loader)
     start_time = time.time()
     
     for step in range(1, config.max_steps + 1):
+        # Check phase update
+        if current_phase_idx == -1 or step > phases[current_phase_idx].end_step:
+            current_phase_idx += 1
+            train_loader = setup_phase_data(current_phase_idx)
+            dataloader_iter = iter(train_loader)
+
         model.train()
         
         # Get batch
@@ -205,6 +252,7 @@ def train(config: TrainConfig) -> TrainState:
             state.weight_norm = model.get_weight_norm()
             state.embedding_rank = model.get_embedding_rank()
             state.fourier_concentration = compute_fourier_concentration(model)
+            head_usage = compute_head_class_usage(model, test_loader)
             
             # Detect grokking
             if test_acc >= state.grokking_threshold and not state.grokked:
@@ -222,6 +270,7 @@ def train(config: TrainConfig) -> TrainState:
                 "weight_norm": state.weight_norm,
                 "embedding_rank": state.embedding_rank,
                 "fourier_concentration": state.fourier_concentration,
+                "head_class_usage_mean": head_usage.mean().item() if head_usage.numel() > 0 else 0.0,
             }
             state.history.append(entry)
             

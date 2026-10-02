@@ -165,11 +165,54 @@ def train(config: TrainConfig) -> TrainState:
     output_dir = Path(config.output_dir) / config.condition_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
+    results_path = output_dir / "results.json"
+    if results_path.exists():
+        print(f"Run already finished. Returning early from {results_path}")
+        with open(results_path, "r") as f:
+            data = json.load(f)
+            # reconstruct state
+            state.grokked = data["grokked"]
+            state.grokking_step = data["grokking_step"]
+            state.train_acc = data.get("final_train_acc", 0.0)
+            state.test_acc = data.get("final_test_acc", 0.0)
+            state.weight_norm = data.get("final_weight_norm", 0.0)
+            state.embedding_rank = data.get("final_embedding_rank", 0.0)
+            state.fourier_concentration = data.get("final_fourier_concentration", 0.0)
+            state.history = data.get("history", [])
+            if state.history:
+                state.step = state.history[-1]["step"]
+        return state
+
+    # Resume from checkpoint if possible
+    start_step = 1
+    # Find latest checkpoint
+    checkpoints = list(output_dir.glob("checkpoint_*.pt"))
+    if checkpoints:
+        latest_ckpt = max(checkpoints, key=lambda p: int(p.stem.split("_")[-1]))
+        print(f"Resuming from checkpoint {latest_ckpt}")
+        ckpt_data = torch.load(latest_ckpt, map_location=device)
+        model.load_state_dict(ckpt_data["model_state"])
+        optimizer.load_state_dict(ckpt_data["optimizer_state"])
+        start_step = ckpt_data["step"] + 1
+        if "state" in ckpt_data:
+            state_dict = ckpt_data["state"]
+            state.step = state_dict.get("step", 0)
+            state.train_loss = state_dict.get("train_loss", 0.0)
+            state.test_loss = state_dict.get("test_loss", 0.0)
+            state.train_acc = state_dict.get("train_acc", 0.0)
+            state.test_acc = state_dict.get("test_acc", 0.0)
+            state.weight_norm = state_dict.get("weight_norm", 0.0)
+            state.embedding_rank = state_dict.get("embedding_rank", 0.0)
+            state.fourier_concentration = state_dict.get("fourier_concentration", 0.0)
+            state.grokked = state_dict.get("grokked", False)
+            state.grokking_step = state_dict.get("grokking_step", None)
+            state.history = state_dict.get("history", [])
+
     # Training loop
     dataloader_iter = iter(train_loader)
     start_time = time.time()
     
-    for step in range(1, config.max_steps + 1):
+    for step in range(start_step, config.max_steps + 1):
         model.train()
         
         # Get batch
@@ -239,12 +282,27 @@ def train(config: TrainConfig) -> TrainState:
         # Save checkpoint
         if step % config.save_every == 0:
             ckpt_path = output_dir / f"checkpoint_{step}.pt"
+            tmp_ckpt_path = output_dir / f"checkpoint_{step}.pt.tmp"
             torch.save({
                 "step": step,
                 "model_state": model.state_dict(),
                 "optimizer_state": optimizer.state_dict(),
                 "config": asdict(config),
-            }, ckpt_path)
+                "state": {
+                    "step": state.step,
+                    "train_loss": state.train_loss,
+                    "test_loss": state.test_loss,
+                    "train_acc": state.train_acc,
+                    "test_acc": state.test_acc,
+                    "weight_norm": state.weight_norm,
+                    "embedding_rank": state.embedding_rank,
+                    "fourier_concentration": state.fourier_concentration,
+                    "grokked": state.grokked,
+                    "grokking_step": state.grokking_step,
+                    "history": state.history,
+                }
+            }, tmp_ckpt_path)
+            os.replace(tmp_ckpt_path, ckpt_path)
     
     # Save final results
     results = {
@@ -260,8 +318,10 @@ def train(config: TrainConfig) -> TrainState:
     }
     
     results_path = output_dir / "results.json"
-    with open(results_path, "w") as f:
+    tmp_results_path = output_dir / "results.json.tmp"
+    with open(tmp_results_path, "w") as f:
         json.dump(results, f, indent=2)
+    os.replace(tmp_results_path, results_path)
     
     print(f"\nResults saved to {results_path}")
     print(f"Grokked: {state.grokked} at step {state.grokking_step}")

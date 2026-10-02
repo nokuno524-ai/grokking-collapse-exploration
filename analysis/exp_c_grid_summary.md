@@ -1,6 +1,6 @@
 # Experiment C grid: wd x noise (90 runs)
 
-Loaded 90 runs from `/sfs/weka/scratch/qzp4ta/grokking-collapse/results/exp_c_grid`.
+Loaded 90 runs from `/app/results/exp_c_grid`.
 
 ## Mean final test accuracy (rows=wd, cols=noise)
 

@@ -24,6 +24,13 @@ See `AUDIT_CLAUDE.md` for the most recent independent on-disk audit and `NEXT_ST
 uv venv .venv && source .venv/bin/activate
 uv pip install torch numpy matplotlib scipy
 
+# Reproducing results with Orchestrator (End-to-End One Command)
+# Run the entire grid (safe to interrupt and resume):
+python src/orchestrator.py run
+
+# Generate all figures and reports (fast, uses registry.json cache):
+python src/orchestrator.py report
+
 # Single training run
 python src/train.py --condition pure --max-steps 50000
 

@@ -19,6 +19,14 @@ class DatasetConfig:
     collapse_severity: float = 0.5  # How much the synthetic generator has "collapsed" (0=fresh, 1=fully collapsed)
     noise_fraction: float = 0.0  # Fraction of training labels replaced with uniform random labels (baseline)
     seed: int = 42
+    base_seed: Optional[int] = None # Governs train/test split. Defaults to seed.
+    phase_seed: Optional[int] = None # Governs contamination sampling. Defaults to seed.
+
+    def __post_init__(self):
+        if self.base_seed is None:
+            self.base_seed = self.seed
+        if self.phase_seed is None:
+            self.phase_seed = self.seed
 
 
 def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -31,14 +39,16 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
         Targets are (a + b) mod p.
     """
     p = config.prime
-    rng = np.random.RandomState(config.seed)
+
+    # Base rng for train/test split
+    base_rng = np.random.RandomState(config.base_seed)
     
     # Generate all possible (a, b) pairs
     all_pairs = [(a, b) for a in range(p) for b in range(p)]
     all_targets = [(a + b) % p for a, b in all_pairs]
     
     # Shuffle and split
-    indices = rng.permutation(len(all_pairs))
+    indices = base_rng.permutation(len(all_pairs))
     n_train = int(len(all_pairs) * config.train_fraction)
     train_idx = indices[:n_train]
     test_idx = indices[n_train:]
@@ -48,18 +58,21 @@ def generate_modular_arithmetic(config: DatasetConfig) -> Tuple[torch.Tensor, to
     test_pairs = [all_pairs[i] for i in test_idx]
     test_targets_list = [all_targets[i] for i in test_idx]
     
+    # Phase rng for contamination and noise sampling
+    phase_rng = np.random.RandomState(config.phase_seed)
+
     # Apply collapse: replace some training examples with "collapsed" outputs
     if config.collapse_level > 0:
         train_pairs, train_targets_list = apply_collapse(
             train_pairs, train_targets_list, p,
-            config.collapse_level, config.collapse_severity, rng
+            config.collapse_level, config.collapse_severity, phase_rng
         )
 
     # Apply uniform random label noise (baseline ablation, mutually independent of collapse)
     if config.noise_fraction > 0:
         train_pairs, train_targets_list = apply_label_noise(
             train_pairs, train_targets_list, p,
-            config.noise_fraction, rng,
+            config.noise_fraction, phase_rng,
         )
 
     # Convert to tensors

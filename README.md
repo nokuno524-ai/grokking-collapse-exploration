@@ -73,6 +73,15 @@ analysis/                  # generated tables, plots, markdown summaries
 results/                   # results.json + checkpoint_*.pt per run
 ```
 
+## Contamination Schedules
+
+The framework now supports dynamic schedules for applying data contamination (model collapse), configurable via `TrainConfig` parameters like `schedule_type`, `switch_step`, and `switch_to`. This allows studying whether collapse is a *cumulative poisoning* effect or a *critical-period* phenomenon.
+
+- **Cumulative Poisoning Hypothesis:** If contamination permanently scrambles the learned representation, removing it after the grokking phase shouldn't easily recover performance, and grokking should unravel gracefully (or catastrophically) under post-grok poisoning.
+- **Critical-Period Hypothesis:** If collapse merely delays or blocks the onset of grokking, removing the contamination before the cliff might allow grokking to rapidly recover.
+
+Use `src/run_schedule_experiments.py` to launch `--mode recovery` (clean up after initial contamination) or `--mode poison` (inject contamination after initial pure training). See `analysis/recovery_metrics.py` for tools to plot survival curves and compute time-to-grok after removal.
+
 ## References
 
 - Power et al. (2022), *Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets*.
@@ -82,3 +91,20 @@ results/                   # results.json + checkpoint_*.pt per run
 - Shumailov et al. (2024), *The Curse of Recursion*.
 - Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change in Scaling Laws*.
 - Frei et al. (2022), *Benign Overfitting Without Linearity*.
+
+To observe metric trends over training, including the `head_class_usage_mean` metric, check the output `results.json` files generated for each seed inside `results/schedules/`.
+
+```
+Recovery vs. Cumulative Poisoning:
+
+        Accuracy
+        |      (Recovery Hypothesis)
+        |       _ _ _ _ _ _ _ _ _
+        |      /
+        |     /
+        |____/___________________ (Cumulative Poisoning Hypothesis)
+        |
+        +---------------------------------- Steps
+             ^
+         Remove Contamination
+```

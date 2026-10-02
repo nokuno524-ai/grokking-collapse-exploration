@@ -125,6 +125,34 @@ class ModularArithmeticTransformer(nn.Module):
         entropy = -(s * torch.log(s + 1e-10)).sum()
         return torch.exp(entropy).item()
 
+    def get_attention_weights(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass that also returns attention weights.
+        Returns:
+            attn_weights: Tensor of shape (n_layers, batch_size, n_heads, seq_len, seq_len)
+        """
+        batch_size = x.shape[0]
+        tok = self.token_embed(x)
+        positions = torch.arange(2, device=x.device).unsqueeze(0).expand(batch_size, -1)
+        pos = self.pos_embed(positions)
+        h = tok + pos
+
+        attn_weights = []
+        for layer in self.transformer.layers:
+            h_norm = layer.norm1(h)
+            attn_out, attn_weight = layer.self_attn(
+                h_norm, h_norm, h_norm,
+                need_weights=True,
+                average_attn_weights=False
+            )
+            attn_weights.append(attn_weight)
+            h = h + layer.dropout1(attn_out)
+
+            h_norm2 = layer.norm2(h)
+            ff_out = layer.linear2(layer.dropout(layer.activation(layer.linear1(h_norm2))))
+            h = h + layer.dropout2(ff_out)
+
+        return torch.stack(attn_weights)
 
 GrokkingTransformer = ModularArithmeticTransformer
 
